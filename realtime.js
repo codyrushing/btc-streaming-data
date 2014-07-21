@@ -1,5 +1,14 @@
-var io = require("socket.io");
+module.exports = (function(){
+	var realtime = {
+		init: function(httpServer){
+			this.io = require("socket.io")(httpServer);
+			this.buildRooms();
+		},
+		buildRooms: function(){
+			require("./rooms");
+			console.log("building rooms");
+		}
+	};
 
-module.exports = function(httpServer){
-
-}
+	return realtime.init.bind(realtime);
+})();

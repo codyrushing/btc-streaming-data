@@ -18,6 +18,9 @@
     "body-parser": "~1.4.3",
     "gulp": "~3.8.6",
     "finalhandler": "~0.1.0",
-    "socket.io": "~1.0.6"
+    "socket.io": "~1.0.6",
+    "gulp-shell": "^0.2.8",
+    "node-inspector": "^0.7.4",
+    "gulp-if": "^1.2.2"
   }
 }
