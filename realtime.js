@@ -5,7 +5,7 @@ module.exports = (function(){
 			this.buildRooms();
 		},
 		buildRooms: function(){
-			require("./rooms")(this.io);
+
 		}
 	};
 
