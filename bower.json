@@ -1,0 +1,31 @@
+{
+  "name": "btc-streaming-data",
+  "version": "0.0.0",
+  "homepage": "https://github.com/codyrushing/btc-streaming-data",
+  "authors": [
+    "Cody Rushing <codyrushing@gmail.com>"
+  ],
+  "description": "a browser-based bitcoin blockchain visualizer",
+  "keywords": [
+    "btc",
+    "realtime",
+    "react",
+    "backbone",
+    "d3"
+  ],
+  "license": "MIT",
+  "private": true,
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "public/components",
+    "test",
+    "tests"
+  ],
+  "dependencies": {
+    "d3": "~3.4.11",
+    "foundation": "~5.3.3",
+    "backbone": "~1.1.2"
+  }
+}
