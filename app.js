@@ -1,6 +1,7 @@
 var http = require("http"),
 	finalhandler = require("finalhandler"),
 	serveStatic = require("serve-static")("public"),
+	port = process.env.PORT || 3000,
 	server;
 
 /*
@@ -22,6 +23,6 @@ require("./realtime")(server);
 /* 
 * Start listening 
 */
-server.listen(process.env.PORT || 3000, "localhost", function(){
-	console.log("up and running");
+server.listen(port, "localhost", function(){
+	console.log("up and running on port %s", port);
 });
