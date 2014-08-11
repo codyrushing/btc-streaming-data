@@ -10,7 +10,7 @@ room.prototype = {
 };
 
 module.exports = function(io){
-	var files = [];
+	var files = ["exchange-rate"];
 	files.forEach(function(file){
 		new room(io, require("./" + file));
 	});

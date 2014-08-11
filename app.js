@@ -1,6 +1,9 @@
 var http = require("http"),
+	fs = require("fs"),
 	finalhandler = require("finalhandler"),
-	serveStatic = require("serve-static")("public"),
+	publicDir = "public",
+	publicFilePath = __dirname + "/" + publicDir,	
+	serveStatic = require("serve-static")(publicDir),
 	port = process.env.PORT || 3000,
 	server;
 
@@ -14,8 +17,11 @@ var http = require("http"),
 * main request handler
 */
 server = http.createServer(function(req, res){
-	var done = finalhandler(req, res);
-	serveStatic(req, res, done);
+	// instead of 404ing unfound urls, serve them index.html so that the client side routing can take over
+	fs.exists(publicFilePath + req.url, function(exists){
+		if(!exists) req.url = "/index.html";
+		serveStatic(req, res, finalhandler(req, res) );
+	});
 });
 
 require("./realtime")(server);

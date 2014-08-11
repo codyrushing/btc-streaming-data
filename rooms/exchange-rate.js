@@ -1,4 +1,4 @@
-var Room = require("./index");
+var Room = require("./constructor");
 
 var exchangeRate = new Room(){
 

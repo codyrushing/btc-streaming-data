@@ -18,7 +18,7 @@ var gulp = require("gulp"),
 gulp.task("scripts", function(){
 	gulp.src(paths.src.js + "**/*.js")
 		.pipe(jshint())
-		.pipe(jshint.reporter("default"))
+		.pipe(jshint.reporter("default"));
 
 	gulp.src(paths.src.js + "app.js")
 		.pipe(browserify())
