@@ -1,4 +1,6 @@
+// SERVER
 var Room = function(io, options){
+	this.options = options;
 	this.init();
 };
 

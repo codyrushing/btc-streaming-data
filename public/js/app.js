@@ -19665,8 +19665,16 @@ module.exports = Backbone.Router.extend({
 		"test": "test"
 	},
 	initialize: function(){
-		console.log("router init");
-		//_.bindAll(this);
+		//_.bindAll(this); // this is the way lodash would do it
+		this.on("route", this.on_route);
+		this.on("navigate:before", this.on_beforeNavigate);
+	},
+	on_route: function(route){
+		console.log("route happened");
+		console.log(route);
+	},
+	on_beforeNavigate: function(){
+
 	},
 	home: function(route){
 		console.log("landed on home route");
@@ -19683,14 +19691,20 @@ var io = require("socket.io-client"),
 	$ = require("jquery"),
 	_ = require("backbone/node_modules/underscore"),
 	Backbone = require("backbone"),
-	Router = require("./base/router");
+	Router = require("./base/Router");
 
 Backbone.$ = $;
 
 var app = {
 	init: function(){
+		this.socketConnect();
 		this.initRouter();
 		$(this.domReady.bind(this));
+	},
+	socketConnect: function(){
+		this.fullHost = window.location.protocol + "//" + window.location.host;
+		console.log(this.fullHost);
+		this.socket = io(this.fullHost);
 	},
 	domReady: function(){
 		Backbone.history.start({
@@ -19700,13 +19714,10 @@ var app = {
 		this.bindEvents($(document));
 	},
 	bindEvents: function(root){
-		var fullHost = window.location.protocol + "//" + window.location.hostname,
-			body = $("body");
-
-		root.on("click", "a[href^='/'], a[href^='#'] a[href^='"+fullHost+"']", function(e) {
+		root.on("click", "a[href^='/'], a[href^='#'] a[href^='"+this.fullHost+"']", function(e) {
 			if (!e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
 				e.preventDefault();
-				var hostRe = new RegExp("^"+fullHost),
+				var hostRe = new RegExp("^"+this.fullHost),
 					link = $(e.currentTarget),
 					route = link.attr("href")
 						.replace(hostRe, "")
@@ -19730,4 +19741,4 @@ var app = {
 };
 
 app.init();
-},{"./base/router":50,"backbone":1,"backbone/node_modules/underscore":2,"jquery":6,"socket.io-client":7}]},{},[51])
+},{"./base/Router":50,"backbone":1,"backbone/node_modules/underscore":2,"jquery":6,"socket.io-client":7}]},{},[51])

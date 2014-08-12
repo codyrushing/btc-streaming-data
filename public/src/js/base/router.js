@@ -7,8 +7,16 @@ module.exports = Backbone.Router.extend({
 		"test": "test"
 	},
 	initialize: function(){
-		console.log("router init");
-		//_.bindAll(this);
+		//_.bindAll(this); // this is the way lodash would do it
+		this.on("route", this.on_route);
+		this.on("navigate:before", this.on_beforeNavigate);
+	},
+	on_route: function(route){
+		console.log("route happened");
+		console.log(route);
+	},
+	on_beforeNavigate: function(){
+
 	},
 	home: function(route){
 		console.log("landed on home route");
