@@ -6,7 +6,7 @@ var Room = function(io, options){
 
 Room.prototype = {
 	init: function(){
-		io.of();
+		//io.of();
 	}
 };
 
