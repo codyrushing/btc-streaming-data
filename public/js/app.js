@@ -19656,61 +19656,95 @@ function toArray(list, index) {
 }
 
 },{}],50:[function(require,module,exports){
+module.exports = function(app){
+	
+	var RoomListener = function(options){
+		this.options = options;
+		this.init();
+	};
+
+	RoomListener.prototype = {
+		init: function(){
+			// on init, go ahead and start listening
+			console.log(app.socket);
+			app.socket.emit("joinRoom", {
+				room: this.options.room
+			});
+		},
+		stop: function(){
+			app.socket.emit("leaveRoom", {
+				room: this.options.room
+			});
+		}
+	};
+
+	return RoomListener;
+};
+},{}],51:[function(require,module,exports){
 var _ = require("backbone/node_modules/underscore"),
-	Backbone = require("backbone");
+	Backbone = require("backbone"),
+	RoomListener;
 
-module.exports = Backbone.Router.extend({
-	routes: {
-		"": "home",
-		"test": "test"
-	},
-	initialize: function(){
-		//_.bindAll(this); // this is the way lodash would do it
-		this.on("route", this.on_route);
-		this.on("navigate:before", this.on_beforeNavigate);
-	},
-	on_route: function(route){
-		console.log("route happened");
-		console.log(route);
-	},
-	on_beforeNavigate: function(){
+module.exports = function(app){
+	return Backbone.Router.extend({
+		routes: {
+			"": "home",
+			"test": "test"
+		},
+		initialize: function(){
+			//_.bindAll(this); // this is the way lodash would do it
+			RoomListener = require("./RoomListener")(app);
+			this.on("route", this.on_route);
+			this.on("navigate:before", this.on_beforeNavigate);
+		},
+		on_route: function(route){
+			console.log("route happened");
+			console.log(route);
+		},
+		on_beforeNavigate: function(){
 
-	},
-	home: function(route){
-		console.log("landed on home route");
-		console.log(route);
-	},
-	test: function(route){
-		console.log("landed on test route");
-		console.log(route);				
-	}
-});
-},{"backbone":1,"backbone/node_modules/underscore":2}],51:[function(require,module,exports){
+		},
+		home: function(route){
+			console.log("landed on home route");
+			console.log(route);
+		},
+		test: function(route){
+			console.log("landed on test route");
+			console.log(route);
+			var testListener = new RoomListener({
+				room: "exchange-rate"
+			});
+
+		}
+	});
+};
+},{"./RoomListener":50,"backbone":1,"backbone/node_modules/underscore":2}],52:[function(require,module,exports){
 "use strict";
 var io = require("socket.io-client"),
 	$ = require("jquery"),
 	_ = require("backbone/node_modules/underscore"),
 	Backbone = require("backbone"),
-	Router = require("./base/Router");
+	Router;
 
 Backbone.$ = $;
 
 var app = {
 	init: function(){
+		// defined here because it needs access to our app object
+		Router = require("./base/Router")(app);
 		this.socketConnect();
 		this.initRouter();
 		$(this.domReady.bind(this));
 	},
 	socketConnect: function(){
 		this.fullHost = window.location.protocol + "//" + window.location.host;
-		console.log(this.fullHost);
 		this.socket = io(this.fullHost);
 	},
 	domReady: function(){
 		Backbone.history.start({
 			pushState: true,
 			hashChange: false
-		});		
+		});
 		this.bindEvents($(document));
 	},
 	bindEvents: function(root){
@@ -19741,4 +19775,4 @@ var app = {
 };
 
 app.init();
-},{"./base/Router":50,"backbone":1,"backbone/node_modules/underscore":2,"jquery":6,"socket.io-client":7}]},{},[51])
+},{"./base/Router":51,"backbone":1,"backbone/node_modules/underscore":2,"jquery":6,"socket.io-client":7}]},{},[52])

@@ -16,6 +16,7 @@ module.exports = (function(){
 				if(data.room){
 					socket.join(data.room);
 					self.io.sockets.in(data.room).emit("join");
+					console.log("socket with id %s has joined this room", socket.id);
 				}
 			});
 			socket.on("leaveRoom", function(data){

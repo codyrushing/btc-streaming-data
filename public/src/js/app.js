@@ -3,26 +3,27 @@ var io = require("socket.io-client"),
 	$ = require("jquery"),
 	_ = require("backbone/node_modules/underscore"),
 	Backbone = require("backbone"),
-	Router = require("./base/Router");
+	Router;
 
 Backbone.$ = $;
 
 var app = {
 	init: function(){
+		// defined here because it needs access to our app object
+		Router = require("./base/Router")(app);
 		this.socketConnect();
 		this.initRouter();
 		$(this.domReady.bind(this));
 	},
 	socketConnect: function(){
 		this.fullHost = window.location.protocol + "//" + window.location.host;
-		console.log(this.fullHost);
 		this.socket = io(this.fullHost);
 	},
 	domReady: function(){
 		Backbone.history.start({
 			pushState: true,
 			hashChange: false
-		});		
+		});
 		this.bindEvents($(document));
 	},
 	bindEvents: function(root){
