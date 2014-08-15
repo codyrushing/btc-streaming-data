@@ -7,12 +7,12 @@ var Room = function(io, options){
 
 Room.prototype = {
 	init: function(){
-		this.io.sockets.in(this.options)
+		this.io.sockets.in(this.options.roomName)
 			.on("join", this.on_join.bind(this))
 			.on("leave", this.on_leave.bind(this));
 	},
 	on_join: function(){
-
+		console.log(this.io.sockets.in(this.options.roomName));
 	},
 	on_leave: function(){
 
