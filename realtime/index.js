@@ -17,7 +17,7 @@ module.exports = (function(){
 			});
 			socket.on("leaveRoom", function(data){
 				self.on_leaveRoom.call(self, data, socket);
-			}); 
+			});
 		},
 		on_joinRoom: function(data, socket){
 			if(data.room){
@@ -37,8 +37,8 @@ module.exports = (function(){
 		buildRooms: function(){
 			var self = this;
 			this.rooms = {};
-			require("./rooms").forEach(function(file, i){
-				self.rooms[file] = new Room(self.io, require("./rooms/" + file));
+			require("./rooms").forEach(function(file, i){	
+				self.rooms[file] = require("./rooms/" + file)(self.io);
 			});
 		}
 	};

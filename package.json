@@ -26,6 +26,7 @@
     "socket.io-client": "^1.0.6",
     "lodash": "~2.4.1",
     "backbone": "~1.1.2",
-    "jquery": "~2.1.1"
+    "jquery": "~2.1.1",
+    "request": "~2.40.0"
   }
 }
