@@ -1,16 +1,23 @@
 var request = require("request"),
-	IntervalRoom = require("../IntervalRoom");
+	IntervalRoom = require("../IntervalRoom"),
+	roomName = (function(){
+		var arr = __filename.split("/");
+		return arr[arr.length-1].split(".")[0];
+	})();
 
 module.exports = function(io){
 	return new IntervalRoom(io, {
-		roomName: "exchange-rate",
+		roomName: roomName,
 		on_loop: function(){
 			var self = this;
-			request("https://blockchain.info/ticker?api_code={{APICODE}}", function (err, res, body) {
+			console.log("loop");
+			/*
+			request({ url: "https://blockchain.info/ticker", qs: { api_code: process.env.BLOCKCHAIN_API_CODE } }, function (err, res, body) {
 				if (!err && res.statusCode == 200) {
 					self.on_data.call(self, body);
 				}
 			});
+			*/
 		}
 	});
 };

@@ -22,7 +22,7 @@ Room.prototype = {
 		this.updateRoomStatus();
 	},
 	updateRoomStatus: function(){
-		this.getNumberOfListeners() ? this.hasListeners() : this.isEmpty();
+		this.getNumberOfListeners() ? this.on_active() : this.on_empty();
 	},
 	on_data: function(data){
 		this.updateRoomStatus();
@@ -31,7 +31,7 @@ Room.prototype = {
 		console.log(data);
 		this.io.sockets.in(this.options.roomName).emit("data", data);
 	},
-	getNumberOfListeners: function(){
+	getNumberOfListeners: function(){		
 		return this.io.sockets.in(this.options.roomName).sockets.length;
 	}
 };
