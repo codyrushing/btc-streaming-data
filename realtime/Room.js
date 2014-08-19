@@ -1,6 +1,11 @@
+var _ = require("lodash");
+
 var Room = function(io, options){
 	this.io = io;
-	this.options = options;
+
+	this.options = _.defaults({
+		cacheLength: 10
+	}, options);
 
 	this.init();
 };
@@ -25,11 +30,25 @@ Room.prototype = {
 		this.getNumberOfListeners() ? this.on_active() : this.on_empty();
 	},
 	on_data: function(data){
+		if(!data.date){
+			data.date = new Date();
+		}
+		this.cachePopulator(data);
 		this.updateRoomStatus();
 		if(!this.getNumberOfListeners()) return;
 		console.log("emitting data");
 		console.log(data);
 		this.io.sockets.in(this.options.roomName).emit("data", data);
+	},
+	cachePopulator: function(data){
+		// receives data and adds determines if it needs to add it to cache
+		this.cache = this.cache || [];
+		if ( this.cache.length < this.options.cacheLength ){
+			this.cache.push(data);
+		} else {
+			// run logic using dates on these items
+			var lastDate = _.last(this.cache).date;
+		}
 	},
 	getNumberOfListeners: function(){		
 		return this.io.sockets.in(this.options.roomName).sockets.length;
