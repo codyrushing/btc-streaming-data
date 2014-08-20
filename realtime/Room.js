@@ -11,12 +11,23 @@ var Room = function(io, options){
 };
 
 Room.prototype = {
+	interval: 10 * 1000,
+	cacheInterval: 60 * 1000 * 15,
+	dataLength: 10,
 	init: function(){
+		this.initCache();
 		this.io.sockets.in(this.options.roomName)
 			.on("join", this.on_join.bind(this))
 			.on("leave", this.on_join.bind(this));
 
 		this.updateRoomStatus();
+	},
+	initCache: function(){
+		this.cache = this.cache || [];
+		// define max possible timeRange
+		this.maxTimeRange = this.cacheInterval * this.dataLength;
+		// define max possible # of items in cache (if all items are coming from shorter interval)
+		this.maxCacheLength = Math.round(this.maxTimeRange / this.interval);
 	},
 	// called only when client emits custom "joinRoom" event
 	on_join: function(data, socket){
@@ -27,6 +38,13 @@ Room.prototype = {
 		this.updateRoomStatus();
 	},
 	updateRoomStatus: function(){
+		if(this.getNumberOfListeners()){
+			if(!this.active) this.on_active();
+			this.active = true;
+		} else {
+			this.on_empty();
+			this.active = false;
+		}
 		this.getNumberOfListeners() ? this.on_active() : this.on_empty();
 	},
 	on_data: function(data){
@@ -41,13 +59,21 @@ Room.prototype = {
 		this.io.sockets.in(this.options.roomName).emit("data", data);
 	},
 	cachePopulator: function(data){
-		// receives data and adds determines if it needs to add it to cache
-		this.cache = this.cache || [];
-		if ( this.cache.length < this.options.cacheLength ){
+		// if we're at our limit, knock one off of the beginning
+		if(this.cache.length === this.maxCacheLength) this.cache.shift();
+
+		this.cache = _.sortBy(this.cache, function(item){
+			return item.date;
+		});
+		if ( this.cache.length < this.options.dataLength ){
 			this.cache.push(data);
 		} else {
 			// run logic using dates on these items
-			var lastDate = _.last(this.cache).date;
+			this.cache = _.sortBy(this.cache, function(item){
+				return item.date;
+			});
+			if (this.cache[0].date + this.)
+
 		}
 	},
 	getNumberOfListeners: function(){		
