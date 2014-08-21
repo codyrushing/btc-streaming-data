@@ -62,19 +62,59 @@ Room.prototype = {
 		// if we're at our limit, knock one off of the beginning
 		if(this.cache.length === this.maxCacheLength) this.cache.shift();
 
+		// add data
+		this.cache.push(data);
+
+		this.setRangeData();
+
+	},
+	setRangeData: function(){
+		var i,
+			medianPoint,
+			targetDateInterval,
+			initialDate,
+			finalDate,
+			prevIndex,
+			diff,
+			iDiff,
+			rangeData = [];
+
+		// sort by date
 		this.cache = _.sortBy(this.cache, function(item){
 			return item.date;
 		});
-		if ( this.cache.length < this.options.dataLength ){
-			this.cache.push(data);
-		} else {
-			// run logic using dates on these items
-			this.cache = _.sortBy(this.cache, function(item){
-				return item.date;
-			});
-			if (this.cache[0].date + this.)
 
+		if(this.cache.length < this.dataLength){
+			// if we have less than the desired # of data points, just return what we have
+			rangeData = this.cache;
+		} else {
+			// get n number or representative data points			
+			initialDate = this.cache[0].date.getTime();
+			finalDate = this.cache[this.cache.length-1].date.getTime();
+			prevIndex = this.cache.length-1;
+
+			targetDateInterval = (finalDate - initialDate) / (this.dataLength+1);
+			
+			for (i=this.dataLength; i>0; i--){
+				// define our median points
+				medianPoint = (targetDateInterval * i) + initialDate;
+				diff = Infinity;
+				// loop through cache backwards, starting at prevIndex, finding the data point closest to our median point
+				for(prevIndex; prevIndex>-1; prevIndex--){
+					iDiff = Math.abs( medianPoint - this.cache[prevIndex].data.getTime() );
+					if(iDiff > diff){
+						// this means we have passed the closest item and are now getting further away from medianPoint
+						// so it is safe to conclude that the previous item in the loop was our closest point
+						rangeData.unshift(this.cache[prevIndex+1]);
+						break;
+					}
+					diff = iDiff;
+				}
+			}
 		}
+
+		this.rangeData = rangeData;
+
 	},
 	getNumberOfListeners: function(){		
 		return this.io.sockets.in(this.options.roomName).sockets.length;
