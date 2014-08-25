@@ -18,6 +18,16 @@ module.exports = (function(){
 			socket.on("leaveRoom", function(data){
 				self.on_leaveRoom.call(self, data, socket);
 			});
+			socket.on("disconnect", function(data){
+				// make sure all rooms know that this socket has disconnected
+				socket.rooms.forEach(function(roomName, i){
+					var room;
+					if(self.rooms.hasOwnProperty(roomName)){
+						room = self.rooms[roomName];
+						room.on_leave.call(room, socket);
+					}
+				});
+			})
 		},
 		on_joinRoom: function(data, socket){
 			if(data.room){
@@ -31,7 +41,6 @@ module.exports = (function(){
 		on_leaveRoom: function(data, socket){
 			if(data.room){
 				socket.leave(data.room);
-				self.io.sockets.to(data.room).emit("socketLeave");
 			}
 		},
 		buildRooms: function(){

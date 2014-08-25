@@ -11,15 +11,14 @@ IntervalRoom.prototype = _.create(Room.prototype, {
 	on_active: function(){
 		if(this.timer) {
 			// this is breaking the loop
-			clearInterval(this.interval);
+			clearInterval(this.timer);
 		} else {
 			this.loop();
-			this.timer = setInterval(this.loop.bind(this), this.interval);			
+			this.timer = setInterval(this.loop.bind(this), this.options.interval);			
 		} 
 	},
 	on_empty: function(){		
-		if(this.timer) clearInterval(this.timer);		
-		// do empty stuff
+		if(this.timer) clearInterval(this.timer);
 	},
 	loop: function(){
 		// do something
