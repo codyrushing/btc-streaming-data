@@ -5,8 +5,6 @@ var Room = function(io, options){
 	this.io = io;
 
 	this.options = _.defaults(options, {
-		interval: 10 * 1000,
-		cacheInterval: 60 * 1000 * 15,
 		medianLength: 10
 	});
 
@@ -28,7 +26,7 @@ Room.prototype = {
 		// define max possible # of items in cache (if all items are coming from shorter interval)
 		// cacheInterval * medianLength gives you the max date range that our cache needs to hold
 		// divide that by the interval to get the max possible # of items to hold in the cache
-		this.maxCacheLength = Math.round(this.cacheInterval * this.options.medianLength / this.interval);
+		this.maxCacheLength = Math.round(this.options.cacheInterval * this.options.medianLength / this.options.interval);
 	},
 	// called only when client emits custom "joinRoom" event
 	on_join: function(socket){
@@ -58,8 +56,6 @@ Room.prototype = {
 		this.cachePopulator(data);
 		this.updateRoomStatus();
 		if(!this.getNumberOfListeners()) return;
-		console.log("emitting data");
-		console.log(data);
 		this.io.sockets.in(this.options.roomName).emit("data", data);
 	},
 	cachePopulator: function(data){
@@ -73,6 +69,7 @@ Room.prototype = {
 		this.medianRange = medianRange(this.cache, this.options.medianLength, function(item){
 			return item.date.getTime();
 		});
+		console.log(_.pluck(this.medianRange, "date"));
 
 	},
 	getNumberOfListeners: function(){		

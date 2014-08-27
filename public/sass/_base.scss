@@ -1,0 +1,8 @@
+@charset "UTF-8";
+$foundationRoot: "../components/foundation/scss/foundation";
+
+/* SETUP */
+@import "../components/foundation/scss/normalize";
+@import "settings";
+
+@import "../components/foundation/scss/foundation/components/global";
