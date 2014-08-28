@@ -24,6 +24,8 @@
     "tests"
   ],
   "dependencies": {
-    "foundation": "~5.3.3"
-  }
+    "foundation": "~5.3.3",
+    "inuit-starter-kit": "~0.2.8"
+  },
+  "devDependencies": {}
 }
