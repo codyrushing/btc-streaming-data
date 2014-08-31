@@ -1,10 +1,8 @@
-$inuit-base-font-size: 12px;
-@import "../components/inuit-defaults/settings.defaults";
+@import "normalize";
+@import "susy";
 
-@import "../components/inuit-functions/tools.functions";
-@import "../components/inuit-mixins/tools.mixins";
+$susy: (
+	global-box-sizing: border-box
+);
 
-@import "../components/inuit-normalize/generic.normalize";
-@import "../components/inuit-box-sizing/generic.box-sizing";
-
-@import "../components/inuit-page/base.page";
+@include border-box-sizing;

@@ -46,6 +46,7 @@ gulp.task("server", function(){
 
 gulp.task("compass", function(){
 	gulp.src("public/sass/*.scss")
+		.pipe(plumber())
 		.pipe(compass({
 			project: path.join(__dirname, "public"),
 			config_file: "./config.rb"
