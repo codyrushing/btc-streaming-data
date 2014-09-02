@@ -1,0 +1,10 @@
+$spacing: 1em;
+$text-color-on-dark: #ededed;
+
+$primary-color: #20598F;
+$secondary-color: #F7931A;
+
+@mixin styledSection {	
+	background: rgba(200,200,200, 0.2); 
+	border-bottom: 1px solid #333; 
+}

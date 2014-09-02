@@ -2,7 +2,9 @@
 var io = require("socket.io-client"),
 	$ = require("jquery"),
 	_ = require("backbone/node_modules/underscore"),
+	React = require("react"),
 	Backbone = require("backbone"),
+	pageView = require("./views/page"),
 	Router;
 
 Backbone.$ = $;
@@ -20,6 +22,7 @@ var app = {
 		this.socket = io(this.fullHost);
 	},
 	domReady: function(){
+		React.renderComponent(pageView(null), document.getElementsByTagName("body")[0]);
 		Backbone.history.start({
 			pushState: true,
 			hashChange: false
