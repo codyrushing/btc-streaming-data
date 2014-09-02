@@ -45,6 +45,16 @@ gulp.task("scripts", function(){
 		.pipe( gulp.dest( paths.dest.js ) );
 });
 
+/*
+* YOU MUST ADD 
+==============
+
+ulimit -n 2560
+
+==============
+TO YOUR .bash_profile, otherwise browserify will fail
+*/
+
 gulp.task("browserify", function(){
 	// then browserify it
 	gulp.src(paths.src.js + "app.js")
