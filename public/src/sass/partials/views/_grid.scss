@@ -1,0 +1,9 @@
+.home {
+	//@include bleed-x(100%);
+	padding: gutter();
+	article { 
+		@include gallery(3);
+		margin-bottom: gutter();
+		min-height: 200px; background: rgba(0,0,0,0.75);
+	}
+}

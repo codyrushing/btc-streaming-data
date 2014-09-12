@@ -1,0 +1,13 @@
+// border-box everything
+@include border-box-sizing;
+
+html { height: 100%; }
+body { background: url(../images/escheresque_ste.png) 0 0 repeat; font-size: 13px; font-family: 'PT Sans Narrow', sans-serif; color: $text-color-on-dark; min-height: 100%; }
+a, a:visited { 
+	color: #fff; text-decoration: none; transition: all 0.1s ease-in-out; 
+	.highlight { color: $primary-color; transition: all 0.1s ease-in-out; }
+}
+a:hover { 
+	color: $secondary-color; 
+	.highlight { color: #fff; }
+}

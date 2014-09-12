@@ -22,7 +22,7 @@ var app = {
 		this.socket = io(this.fullHost);
 	},
 	domReady: function(){
-		React.renderComponent(pageView(null), document.getElementsByTagName("body")[0]);
+		React.renderComponent(pageView(null), document.body);
 		Backbone.history.start({
 			pushState: true,
 			hashChange: false

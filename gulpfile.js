@@ -11,7 +11,7 @@ var gulp = require("gulp"),
 		src: {
 			js: "public/src/js/",
 			views: "public/src/jsx/views/",
-			sass: "public/sass/"
+			sass: "public/src/sass/"
 		},
 		dest: {
 			js: "public/js/",
@@ -76,10 +76,11 @@ gulp.task("server", function(){
 });
 
 gulp.task("compass", function(){
-	gulp.src("public/sass/*.scss")
+	gulp.src(paths.src.sass + "*.scss")
 		.pipe(plumber())
 		.pipe(compass({
 			project: path.join(__dirname, "public"),
+			sass: "src/sass",
 			config_file: "./config.rb"
 		}))
 		.pipe(gulp.dest( paths.dest.css ))
@@ -89,6 +90,7 @@ gulp.task("watch", function(){
 	gulp.watch([paths.src.views + "**/*.jsx"], ["react"]);
 	gulp.watch([paths.src.js + "**/*.js"], ["scripts"]);
 	gulp.watch([paths.src.sass + "**/*.scss"], ["compass"]);
+	gulp.watch(["gulpfile.js"], ["dev"]);
 });
 
 gulp.task("dev", ["server", "react", "scripts", "compass", "watch"]);

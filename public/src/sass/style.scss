@@ -1,0 +1,20 @@
+// SUSY SETTINGS
+$column-count: 12;
+$gutter-width: 1/4;
+$susy: (
+	global-box-sizing: border-box,
+	math: fluid,
+	gutters: $gutter-width,
+	columns: $column-count,
+);
+
+// VENDOR
+@import "normalize";
+@import "susy";
+
+@import "partials/base";
+@import "partials/global";
+@import "partials/header";
+@import "partials/footer";
+
+@import "partials/views/grid";
