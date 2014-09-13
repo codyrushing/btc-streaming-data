@@ -39,7 +39,6 @@ Room.prototype = {
 		this.updateRoomStatus();
 	},
 	updateRoomStatus: function(){
-		console.log(this.getNumberOfListeners());
 		if(this.getNumberOfListeners()){
 			if(!this.active) this.on_active();
 			this.active = true;
@@ -69,7 +68,6 @@ Room.prototype = {
 		this.medianRange = medianRange(this.cache, this.options.medianLength, function(item){
 			return item.date.getTime();
 		});
-		console.log(_.pluck(this.medianRange, "date"));
 
 	},
 	getNumberOfListeners: function(){		

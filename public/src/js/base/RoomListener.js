@@ -8,9 +8,12 @@ module.exports = function(app){
 	RoomListener.prototype = {
 		init: function(){
 			// on init, go ahead and start listening
-			console.log(app.socket);
 			app.socket.emit("joinRoom", {
 				room: this.options.room
+			});
+			app.socket.on("data", function(data){
+				console.log("got data:");
+				console.log(data);
 			});
 		},
 		stop: function(){

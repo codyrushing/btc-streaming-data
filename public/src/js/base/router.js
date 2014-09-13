@@ -1,12 +1,14 @@
 var _ = require("backbone/node_modules/underscore"),
+	React = require("react"),
 	Backbone = require("backbone"),
 	RoomListener;
 
 module.exports = function(app){
+	console.log(app);
 	return Backbone.Router.extend({
 		routes: {
 			"": "home",
-			"test": "test"
+			"exchange-rate": "exchangeRate"
 		},
 		initialize: function(){
 			//_.bindAll(this); // this is the way lodash would do it
@@ -22,16 +24,14 @@ module.exports = function(app){
 
 		},
 		home: function(route){
-			console.log("landed on home route");
-			console.log(route);
+			var dashboardListener = new RoomListener({
+				room: "dashboard"
+			});
 		},
-		test: function(route){
-			console.log("landed on test route");
-			console.log(route);
-			var testListener = new RoomListener({
+		exchangeRate: function(route){
+			var exchangeRateListener = new RoomListener({
 				room: "exchange-rate"
 			});
-
 		}
 	});
 };

@@ -7,12 +7,15 @@ var io = require("socket.io-client"),
 	pageView = require("./views/page"),
 	Router;
 
+// DEV ONLY - REMOVE THIS IN PRODUCTION
+window.React = React;
+
 Backbone.$ = $;
 
 var app = {
 	init: function(){
 		// defined here because it needs access to our app object
-		Router = require("./base/Router")(app);
+		Router = require("./base/Router")(this);		
 		this.socketConnect();
 		this.initRouter();
 		$(this.domReady.bind(this));

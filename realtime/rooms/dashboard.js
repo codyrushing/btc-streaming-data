@@ -6,10 +6,8 @@ var IntervalRoom = require("../IntervalRoom"),
 	})();
 
 var loop = function(){
-	var self = this;
-
 	blockchainRequest({
-		url: "/ticker",
+		url: "/stats?format=json",
 		success: function(res, body){
 			this.on_data(JSON.parse(body));
 		}.bind(this)
@@ -19,7 +17,7 @@ var loop = function(){
 module.exports = function(io){
 	return new IntervalRoom(io, {
 		roomName: roomName,
-		interval: 30 * 1000,
+		interval: 60 * 1000 * 15,
 		cacheInterval: 60 * 1000 * 15,
 		on_activeLoop: loop,
 		on_emptyLoop: loop

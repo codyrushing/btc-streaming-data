@@ -1,9 +1,21 @@
-.home {
-	//@include bleed-x(100%);
-	padding: gutter();
-	article { 
-		@include gallery(3);
-		margin-bottom: gutter();
-		min-height: 200px; background: rgba(0,0,0,0.75);
+.grid {
+	@include clearfix();	
+}
+
+main {
+
+	&.home {
+		//@include bleed-x(100%);
+		@include clearfix();
+		padding: gutter();
+		.grid-item { 
+			@include gallery(3);
+			padding: gutter();
+			margin-bottom: gutter();
+			text-align: center;
+			background: rgba(0,0,0,0.35);
+			border-left: 5px solid $primary-color;
+		}
 	}
+
 }

@@ -38297,9 +38297,12 @@ module.exports = function(app){
 	RoomListener.prototype = {
 		init: function(){
 			// on init, go ahead and start listening
-			console.log(app.socket);
 			app.socket.emit("joinRoom", {
 				room: this.options.room
+			});
+			app.socket.on("data", function(data){
+				console.log("got data:");
+				console.log(data);
 			});
 		},
 		stop: function(){
@@ -38313,14 +38316,16 @@ module.exports = function(app){
 };
 },{}],196:[function(require,module,exports){
 var _ = require("backbone/node_modules/underscore"),
+	React = require("react"),
 	Backbone = require("backbone"),
 	RoomListener;
 
 module.exports = function(app){
+	console.log(app);
 	return Backbone.Router.extend({
 		routes: {
 			"": "home",
-			"test": "test"
+			"exchange-rate": "exchangeRate"
 		},
 		initialize: function(){
 			//_.bindAll(this); // this is the way lodash would do it
@@ -38336,20 +38341,18 @@ module.exports = function(app){
 
 		},
 		home: function(route){
-			console.log("landed on home route");
-			console.log(route);
+			var dashboardListener = new RoomListener({
+				room: "dashboard"
+			});
 		},
-		test: function(route){
-			console.log("landed on test route");
-			console.log(route);
-			var testListener = new RoomListener({
+		exchangeRate: function(route){
+			var exchangeRateListener = new RoomListener({
 				room: "exchange-rate"
 			});
-
 		}
 	});
 };
-},{"./RoomListener":195,"backbone":1,"backbone/node_modules/underscore":2}],197:[function(require,module,exports){
+},{"./RoomListener":195,"backbone":1,"backbone/node_modules/underscore":2,"react":151}],197:[function(require,module,exports){
 "use strict";
 var io = require("socket.io-client"),
 	$ = require("jquery"),
@@ -38359,12 +38362,15 @@ var io = require("socket.io-client"),
 	pageView = require("./views/page"),
 	Router;
 
+// DEV ONLY - REMOVE THIS IN PRODUCTION
+window.React = React;
+
 Backbone.$ = $;
 
 var app = {
 	init: function(){
 		// defined here because it needs access to our app object
-		Router = require("./base/Router")(app);
+		Router = require("./base/Router")(this);		
 		this.socketConnect();
 		this.initRouter();
 		$(this.domReady.bind(this));
@@ -38415,18 +38421,32 @@ var React = require("react");
 
 var MainView = React.createClass({displayName: 'MainView',
   	render: function() {
+  		console.log("logging props:");
+  		console.log(this.props);
+  		console.log("logging state:");
+  		console.log(this.state);
+		if(this.props.data){
+			return this.dashboard();
+		} else {
+			return this.bare();
+		}
+  	},
+  	dashboard: function(){
 		return (
 			React.DOM.main({className: "home"}, 
-				React.DOM.article(null), 
-				React.DOM.article(null), 
-				React.DOM.article(null), 
-				React.DOM.article(null), 
-				React.DOM.article(null), 
-				React.DOM.article(null), 
-				React.DOM.article(null), 
-				React.DOM.article(null)
+				React.DOM.h1({className: "section-title"}, "Last 24 hours"), 
+				React.DOM.section({className: "grid"}, 
+					React.DOM.article({className: "grid-item"}), 
+					React.DOM.article({className: "grid-item"}), 
+					React.DOM.article({className: "grid-item"}), 
+					React.DOM.article({className: "grid-item"}), 
+					React.DOM.article({className: "grid-item"})
+				)
 			)
 		);
+  	},
+  	bare: function(){
+  		return (React.DOM.main(null));
   	}
 });
 
@@ -38437,7 +38457,28 @@ var React = require("react"),
 	MainView = require("./main");
 
 var PageView = React.createClass({displayName: 'PageView',
+  	getInitialState: function(){
+  		return {
+  			route: "/",
+  			data: []
+  		};
+  	},
   	render: function() {
+		var navItems = {
+			"/": "Dashboard",
+			"/exchange-rate": "Exchange rate",
+			"/current-block": "Current Block"
+		},
+		nav = Object.keys(navItems).map(function(route){
+			var title = navItems[route];
+				className = this.state.route === route ? "active" : "";
+
+			return (
+				React.DOM.a({href: route, title: title, className: className}, title)
+			);
+
+		}, this);
+
 		return (
 			React.DOM.section({className: "wrapper"}, 
 				React.DOM.header(null, 
@@ -38445,12 +38486,14 @@ var PageView = React.createClass({displayName: 'PageView',
 						"Blockchain", React.DOM.span({className: "highlight"}, " Realtime")
 					), 
 					React.DOM.nav(null, 
-						React.DOM.a({href: "https://github.com/codyrushing/btc-streaming-data", target: "_blank"}, "Github")
-					)					
+						nav
+					)
 				), 
 				MainView(null), 
 				React.DOM.footer(null, 
-					"footer text"
+					React.DOM.nav(null, 
+						React.DOM.a({href: "https://github.com/codyrushing/btc-streaming-data", target: "_blank"}, "Github")
+					)					
 				)
 			)
 		);
