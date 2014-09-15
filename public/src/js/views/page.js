@@ -3,6 +3,16 @@ var React = require("react"),
 	MainView = require("./main");
 
 var PageView = React.createClass({displayName: 'PageView',
+ componentWillMount : function() {
+    this.callback = (function(route) {
+      this.setState({ currentRoute: this.props.router.current });
+    }).bind(this);
+  
+    this.props.router.on("route", this.callback);
+  },
+ componentWillUnmount : function() {
+    this.props.router.off("route", this.callback);
+  },
   	getInitialState: function(){
   		return {
   			route: "/",
@@ -17,7 +27,7 @@ var PageView = React.createClass({displayName: 'PageView',
 		},
 		nav = Object.keys(navItems).map(function(route){
 			var title = navItems[route];
-				className = this.state.route === route ? "active" : "";
+			var className = this.state.currentRoute === route ? "active" : "";
 
 			return (
 				React.DOM.a({href: route, title: title, className: className}, title)

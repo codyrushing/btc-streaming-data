@@ -25,7 +25,9 @@ var app = {
 		this.socket = io(this.fullHost);
 	},
 	domReady: function(){
-		React.renderComponent(pageView(null), document.body);
+    React.renderComponent(pageView({router: this.router}),
+      document.body
+    );
 		Backbone.history.start({
 			pushState: true,
 			hashChange: false

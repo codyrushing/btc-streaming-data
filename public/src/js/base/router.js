@@ -8,7 +8,8 @@ module.exports = function(app){
 	return Backbone.Router.extend({
 		routes: {
 			"": "home",
-			"exchange-rate": "exchangeRate"
+			"exchange-rate": "exchangeRate",
+      "current-block": "currentBlock"
 		},
 		initialize: function(){
 			//_.bindAll(this); // this is the way lodash would do it
@@ -24,11 +25,20 @@ module.exports = function(app){
 
 		},
 		home: function(route){
+      this.current = "/";
 			var dashboardListener = new RoomListener({
 				room: "dashboard"
 			});
 		},
+		currentBlock: function(route){
+      this.current = "/current-block";
+			var dashboardListener = new RoomListener({
+				room: "current-block"
+			});
+		},
+
 		exchangeRate: function(route){
+      this.current = "/exchange-rate";
 			var exchangeRateListener = new RoomListener({
 				room: "exchange-rate"
 			});
