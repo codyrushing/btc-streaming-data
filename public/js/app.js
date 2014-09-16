@@ -38321,7 +38321,6 @@ var _ = require("backbone/node_modules/underscore"),
 	RoomListener;
 
 module.exports = function(app){
-	console.log(app);
 	return Backbone.Router.extend({
 		routes: {
 			"": "home",
@@ -38334,8 +38333,8 @@ module.exports = function(app){
 			this.on("navigate:before", this.on_beforeNavigate);
 		},
 		on_route: function(route){
-			console.log("route happened");
-			console.log(route);
+			console.log("triggering route");
+			app.dispatcher.trigger("route", route);
 		},
 		on_beforeNavigate: function(){
 
@@ -38370,7 +38369,8 @@ Backbone.$ = $;
 var app = {
 	init: function(){
 		// defined here because it needs access to our app object
-		Router = require("./base/Router")(this);		
+		Router = require("./base/Router")(this);
+		this.dispatcher = _.extend(Backbone.Events);
 		this.socketConnect();
 		this.initRouter();
 		$(this.domReady.bind(this));
@@ -38380,7 +38380,12 @@ var app = {
 		this.socket = io(this.fullHost);
 	},
 	domReady: function(){
-		React.renderComponent(pageView(null), document.body);
+		var self = this;
+		this.pageView = React.renderComponent(pageView(null), document.body, function(){
+			console.log(this);
+			this.dispatcher = self.dispatcher;
+			this.bindEvents();
+		});
 		Backbone.history.start({
 			pushState: true,
 			hashChange: false
@@ -38421,10 +38426,6 @@ var React = require("react");
 
 var MainView = React.createClass({displayName: 'MainView',
   	render: function() {
-  		console.log("logging props:");
-  		console.log(this.props);
-  		console.log("logging state:");
-  		console.log(this.state);
 		if(this.props.data){
 			return this.dashboard();
 		} else {
@@ -38463,6 +38464,13 @@ var PageView = React.createClass({displayName: 'PageView',
   			data: []
   		};
   	},
+  	bindEvents: function(){
+		this.dispatcher.on("route", function(route){
+			this.setState({
+				route: "/"+route
+			});
+		}, this);
+  	},
   	render: function() {
 		var navItems = {
 			"/": "Dashboard",
@@ -38470,7 +38478,7 @@ var PageView = React.createClass({displayName: 'PageView',
 			"/current-block": "Current Block"
 		},
 		nav = Object.keys(navItems).map(function(route){
-			var title = navItems[route];
+			var title = navItems[route],
 				className = this.state.route === route ? "active" : "";
 
 			return (

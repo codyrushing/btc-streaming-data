@@ -9,6 +9,13 @@ var PageView = React.createClass({displayName: 'PageView',
   			data: []
   		};
   	},
+  	bindEvents: function(){
+		this.dispatcher.on("route", function(route){
+			this.setState({
+				route: "/"+route
+			});
+		}, this);
+  	},
   	render: function() {
 		var navItems = {
 			"/": "Dashboard",
@@ -16,7 +23,7 @@ var PageView = React.createClass({displayName: 'PageView',
 			"/current-block": "Current Block"
 		},
 		nav = Object.keys(navItems).map(function(route){
-			var title = navItems[route];
+			var title = navItems[route],
 				className = this.state.route === route ? "active" : "";
 
 			return (

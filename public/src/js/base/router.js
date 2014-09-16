@@ -4,7 +4,6 @@ var _ = require("backbone/node_modules/underscore"),
 	RoomListener;
 
 module.exports = function(app){
-	console.log(app);
 	return Backbone.Router.extend({
 		routes: {
 			"": "home",
@@ -17,8 +16,8 @@ module.exports = function(app){
 			this.on("navigate:before", this.on_beforeNavigate);
 		},
 		on_route: function(route){
-			console.log("route happened");
-			console.log(route);
+			console.log("triggering route");
+			app.dispatcher.trigger("route", route);
 		},
 		on_beforeNavigate: function(){
 

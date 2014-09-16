@@ -3,10 +3,6 @@ var React = require("react");
 
 var MainView = React.createClass({displayName: 'MainView',
   	render: function() {
-  		console.log("logging props:");
-  		console.log(this.props);
-  		console.log("logging state:");
-  		console.log(this.state);
 		if(this.props.data){
 			return this.dashboard();
 		} else {

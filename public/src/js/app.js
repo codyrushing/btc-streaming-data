@@ -15,7 +15,8 @@ Backbone.$ = $;
 var app = {
 	init: function(){
 		// defined here because it needs access to our app object
-		Router = require("./base/Router")(this);		
+		Router = require("./base/Router")(this);
+		this.dispatcher = _.extend(Backbone.Events);
 		this.socketConnect();
 		this.initRouter();
 		$(this.domReady.bind(this));
@@ -25,7 +26,12 @@ var app = {
 		this.socket = io(this.fullHost);
 	},
 	domReady: function(){
-		React.renderComponent(pageView(null), document.body);
+		var self = this;
+		this.pageView = React.renderComponent(pageView(null), document.body, function(){
+			console.log(this);
+			this.dispatcher = self.dispatcher;
+			this.bindEvents();
+		});
 		Backbone.history.start({
 			pushState: true,
 			hashChange: false

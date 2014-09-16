@@ -27,7 +27,7 @@ module.exports = (function(){
 						room.on_leave.call(room, socket);
 					}
 				});
-			})
+			});
 		},
 		on_joinRoom: function(data, socket){
 			if(data.room){
