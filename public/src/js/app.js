@@ -26,12 +26,11 @@ var app = {
 		this.socket = io(this.fullHost);
 	},
 	domReady: function(){
-		var self = this;
-		this.pageView = React.renderComponent(pageView(null), document.body, function(){
-			console.log(this);
-			this.dispatcher = self.dispatcher;
-			this.bindEvents();
-		});
+		React.renderComponent(
+			pageView({router: this.router}),
+			document.body
+    	);
+
 		Backbone.history.start({
 			pushState: true,
 			hashChange: false

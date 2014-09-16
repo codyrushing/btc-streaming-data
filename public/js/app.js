@@ -38324,7 +38324,8 @@ module.exports = function(app){
 	return Backbone.Router.extend({
 		routes: {
 			"": "home",
-			"exchange-rate": "exchangeRate"
+			"exchange-rate": "exchangeRate",
+      "current-block": "currentBlock"
 		},
 		initialize: function(){
 			//_.bindAll(this); // this is the way lodash would do it
@@ -38340,17 +38341,27 @@ module.exports = function(app){
 
 		},
 		home: function(route){
+      this.current = "/";
 			var dashboardListener = new RoomListener({
 				room: "dashboard"
 			});
 		},
+		currentBlock: function(route){
+      this.current = "/current-block";
+			var dashboardListener = new RoomListener({
+				room: "current-block"
+			});
+		},
+
 		exchangeRate: function(route){
+      this.current = "/exchange-rate";
 			var exchangeRateListener = new RoomListener({
 				room: "exchange-rate"
 			});
 		}
 	});
 };
+
 },{"./RoomListener":195,"backbone":1,"backbone/node_modules/underscore":2,"react":151}],197:[function(require,module,exports){
 "use strict";
 var io = require("socket.io-client"),
@@ -38380,12 +38391,11 @@ var app = {
 		this.socket = io(this.fullHost);
 	},
 	domReady: function(){
-		var self = this;
-		this.pageView = React.renderComponent(pageView(null), document.body, function(){
-			console.log(this);
-			this.dispatcher = self.dispatcher;
-			this.bindEvents();
-		});
+		React.renderComponent(
+			pageView({router: this.router}),
+			document.body
+    	);
+
 		Backbone.history.start({
 			pushState: true,
 			hashChange: false
@@ -38420,6 +38430,7 @@ var app = {
 };
 
 app.init();
+
 },{"./base/Router":196,"./views/page":199,"backbone":1,"backbone/node_modules/underscore":2,"jquery":7,"react":151,"socket.io-client":152}],198:[function(require,module,exports){
 /** @jsx React.DOM */
 var React = require("react");
@@ -38458,6 +38469,16 @@ var React = require("react"),
 	MainView = require("./main");
 
 var PageView = React.createClass({displayName: 'PageView',
+ componentWillMount : function() {
+    this.callback = (function(route) {
+      this.setState({ currentRoute: this.props.router.current });
+    }).bind(this);
+  
+    this.props.router.on("route", this.callback);
+  },
+ componentWillUnmount : function() {
+    this.props.router.off("route", this.callback);
+  },
   	getInitialState: function(){
   		return {
   			route: "/",
@@ -38478,9 +38499,8 @@ var PageView = React.createClass({displayName: 'PageView',
 			"/current-block": "Current Block"
 		},
 		nav = Object.keys(navItems).map(function(route){
-			var title = navItems[route],
-				className = this.state.route === route ? "active" : "";
-
+			var title = navItems[route];
+			var className = this.state.currentRoute === route ? "active" : "";
 			return (
 				React.DOM.a({href: route, title: title, className: className}, title)
 			);
@@ -38509,4 +38529,5 @@ var PageView = React.createClass({displayName: 'PageView',
 });
 
 module.exports = PageView;
+
 },{"./main":198,"react":151}]},{},[197])
