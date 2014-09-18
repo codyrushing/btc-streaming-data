@@ -3,28 +3,23 @@ var React = require("react"),
 	MainView = require("./main");
 
 var PageView = React.createClass({displayName: 'PageView',
- componentWillMount : function() {
-    this.callback = (function(route) {
-      this.setState({ currentRoute: this.props.router.current });
-    }).bind(this);
-  
-    this.props.router.on("route", this.callback);
-  },
- componentWillUnmount : function() {
-    this.props.router.off("route", this.callback);
-  },
+	componentWillMount : function() {
+		this.props.dispatcher.on("route", this.onroute, this);
+	},
+	onroute: function(route){
+		console.log(rote);
+		this.setState({
+			currentRoute: route
+		});
+	},
+	componentWillUnmount : function() {
+    	this.props.router.off("route", this.onroute, this);
+  	},
   	getInitialState: function(){
   		return {
   			route: "/",
   			data: []
   		};
-  	},
-  	bindEvents: function(){
-		this.dispatcher.on("route", function(route){
-			this.setState({
-				route: "/"+route
-			});
-		}, this);
   	},
   	render: function() {
 		var navItems = {

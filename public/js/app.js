@@ -38317,15 +38317,14 @@ module.exports = function(app){
 },{}],196:[function(require,module,exports){
 var _ = require("backbone/node_modules/underscore"),
 	React = require("react"),
-	Backbone = require("backbone"),
 	RoomListener;
 
-module.exports = function(app){
+module.exports = function(app, Backbone){
 	return Backbone.Router.extend({
 		routes: {
 			"": "home",
 			"exchange-rate": "exchangeRate",
-      "current-block": "currentBlock"
+			"current-block": "currentBlock"
 		},
 		initialize: function(){
 			//_.bindAll(this); // this is the way lodash would do it
@@ -38333,28 +38332,24 @@ module.exports = function(app){
 			this.on("route", this.on_route);
 			this.on("navigate:before", this.on_beforeNavigate);
 		},
-		on_route: function(route){
-			console.log("triggering route");
-			app.dispatcher.trigger("route", route);
+		on_route: function(route){			
+			app.dispatcher.trigger("route", "/" + (this.currentRoute || Backbone.history.fragment) );
+			this.currentRoute = null;
 		},
 		on_beforeNavigate: function(){
 
 		},
 		home: function(route){
-      this.current = "/";
 			var dashboardListener = new RoomListener({
 				room: "dashboard"
 			});
 		},
 		currentBlock: function(route){
-      this.current = "/current-block";
 			var dashboardListener = new RoomListener({
 				room: "current-block"
 			});
 		},
-
 		exchangeRate: function(route){
-      this.current = "/exchange-rate";
 			var exchangeRateListener = new RoomListener({
 				room: "exchange-rate"
 			});
@@ -38362,7 +38357,7 @@ module.exports = function(app){
 	});
 };
 
-},{"./RoomListener":195,"backbone":1,"backbone/node_modules/underscore":2,"react":151}],197:[function(require,module,exports){
+},{"./RoomListener":195,"backbone/node_modules/underscore":2,"react":151}],197:[function(require,module,exports){
 "use strict";
 var io = require("socket.io-client"),
 	$ = require("jquery"),
@@ -38380,7 +38375,7 @@ Backbone.$ = $;
 var app = {
 	init: function(){
 		// defined here because it needs access to our app object
-		Router = require("./base/Router")(this);
+		Router = require("./base/Router")(this, Backbone);
 		this.dispatcher = _.extend(Backbone.Events);
 		this.socketConnect();
 		this.initRouter();
@@ -38392,7 +38387,7 @@ var app = {
 	},
 	domReady: function(){
 		React.renderComponent(
-			pageView({router: this.router}),
+			pageView({router: this.router, dispatcher: this.dispatcher}),
 			document.body
     	);
 
@@ -38458,7 +38453,7 @@ var MainView = React.createClass({displayName: 'MainView',
 		);
   	},
   	bare: function(){
-  		return (React.DOM.main(null));
+  		return (React.DOM.main(null, React.DOM.a({href: "/test"}, "test")));
   	}
 });
 
@@ -38469,28 +38464,23 @@ var React = require("react"),
 	MainView = require("./main");
 
 var PageView = React.createClass({displayName: 'PageView',
- componentWillMount : function() {
-    this.callback = (function(route) {
-      this.setState({ currentRoute: this.props.router.current });
-    }).bind(this);
-  
-    this.props.router.on("route", this.callback);
-  },
- componentWillUnmount : function() {
-    this.props.router.off("route", this.callback);
-  },
+	componentWillMount : function() {
+		this.props.dispatcher.on("route", this.onroute, this);
+	},
+	onroute: function(route){
+		console.log(rote);
+		this.setState({
+			currentRoute: route
+		});
+	},
+	componentWillUnmount : function() {
+    	this.props.router.off("route", this.onroute, this);
+  	},
   	getInitialState: function(){
   		return {
   			route: "/",
   			data: []
   		};
-  	},
-  	bindEvents: function(){
-		this.dispatcher.on("route", function(route){
-			this.setState({
-				route: "/"+route
-			});
-		}, this);
   	},
   	render: function() {
 		var navItems = {

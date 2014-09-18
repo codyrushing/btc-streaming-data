@@ -24,7 +24,7 @@ var MainView = React.createClass({displayName: 'MainView',
 		);
   	},
   	bare: function(){
-  		return (React.DOM.main(null));
+  		return (React.DOM.main(null, React.DOM.a({href: "/test"}, "test")));
   	}
 });
 

@@ -15,7 +15,7 @@ Backbone.$ = $;
 var app = {
 	init: function(){
 		// defined here because it needs access to our app object
-		Router = require("./base/Router")(this);
+		Router = require("./base/Router")(this, Backbone);
 		this.dispatcher = _.extend(Backbone.Events);
 		this.socketConnect();
 		this.initRouter();
@@ -27,7 +27,7 @@ var app = {
 	},
 	domReady: function(){
 		React.renderComponent(
-			pageView({router: this.router}),
+			pageView({router: this.router, dispatcher: this.dispatcher}),
 			document.body
     	);
 
