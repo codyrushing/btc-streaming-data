@@ -7,7 +7,6 @@ var PageView = React.createClass({displayName: 'PageView',
 		this.props.dispatcher.on("route", this.onroute, this);
 	},
 	onroute: function(route){
-		console.log(rote);
 		this.setState({
 			currentRoute: route
 		});

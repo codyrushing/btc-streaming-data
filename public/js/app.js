@@ -38453,7 +38453,7 @@ var MainView = React.createClass({displayName: 'MainView',
 		);
   	},
   	bare: function(){
-  		return (React.DOM.main(null, React.DOM.a({href: "/test"}, "test")));
+  		return (React.DOM.main(null));
   	}
 });
 
@@ -38468,7 +38468,6 @@ var PageView = React.createClass({displayName: 'PageView',
 		this.props.dispatcher.on("route", this.onroute, this);
 	},
 	onroute: function(route){
-		console.log(rote);
 		this.setState({
 			currentRoute: route
 		});
