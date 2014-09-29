@@ -10,7 +10,6 @@ module.exports = function(app, Backbone){
 			"current-block": "currentBlock"
 		},
 		initialize: function(){
-			//_.bindAll(this); // this is the way lodash would do it
 			RoomListener = require("./RoomListener")(app);
 			this.on("route", this.on_route);
 			this.on("navigate:before", this.on_beforeNavigate);

@@ -38287,77 +38287,6 @@ function toArray(list, index) {
 }
 
 },{}],195:[function(require,module,exports){
-module.exports = function(app){
-	
-	var RoomListener = function(options){
-		this.options = options;
-		this.init();
-	};
-
-	RoomListener.prototype = {
-		init: function(){
-			// on init, go ahead and start listening
-			app.socket.emit("joinRoom", {
-				room: this.options.room
-			});
-			app.socket.on("data", function(data){
-				console.log("got data:");
-				console.log(data);
-			});
-		},
-		stop: function(){
-			app.socket.emit("leaveRoom", {
-				room: this.options.room
-			});
-		}
-	};
-
-	return RoomListener;
-};
-},{}],196:[function(require,module,exports){
-var _ = require("backbone/node_modules/underscore"),
-	React = require("react"),
-	RoomListener;
-
-module.exports = function(app, Backbone){
-	return Backbone.Router.extend({
-		routes: {
-			"": "home",
-			"exchange-rate": "exchangeRate",
-			"current-block": "currentBlock"
-		},
-		initialize: function(){
-			//_.bindAll(this); // this is the way lodash would do it
-			RoomListener = require("./RoomListener")(app);
-			this.on("route", this.on_route);
-			this.on("navigate:before", this.on_beforeNavigate);
-		},
-		on_route: function(route){			
-			app.dispatcher.trigger("route", "/" + (this.currentRoute || Backbone.history.fragment) );
-			this.currentRoute = null;
-		},
-		on_beforeNavigate: function(){
-
-		},
-		home: function(route){
-			var dashboardListener = new RoomListener({
-				room: "dashboard"
-			});
-		},
-		currentBlock: function(route){
-			var dashboardListener = new RoomListener({
-				room: "current-block"
-			});
-		},
-		exchangeRate: function(route){
-			var exchangeRateListener = new RoomListener({
-				room: "exchange-rate"
-			});
-		}
-	});
-};
-
-},{"./RoomListener":195,"backbone/node_modules/underscore":2,"react":151}],197:[function(require,module,exports){
 "use strict";
 var io = require("socket.io-client"),
 	$ = require("jquery"),
@@ -38380,6 +38309,7 @@ var app = {
 		this.socketConnect();
 		this.initRouter();
 		$(this.domReady.bind(this));
+		return this;
 	},
 	socketConnect: function(){
 		this.fullHost = window.location.protocol + "//" + window.location.host;
@@ -38387,7 +38317,7 @@ var app = {
 	},
 	domReady: function(){
 		React.renderComponent(
-			pageView({router: this.router, dispatcher: this.dispatcher}),
+			pageView({dispatcher: this.dispatcher, socket: this.socket}),
 			document.body
     	);
 
@@ -38424,13 +38354,121 @@ var app = {
 	}
 };
 
-app.init();
+module.exports = app.init();
+},{"./base/Router":197,"./views/page":201,"backbone":1,"backbone/node_modules/underscore":2,"jquery":7,"react":151,"socket.io-client":152}],196:[function(require,module,exports){
+module.exports = function(app){
+	
+	var RoomListener = function(options){
+		this.options = options;
+		this.init();
+	};
 
-},{"./base/Router":196,"./views/page":199,"backbone":1,"backbone/node_modules/underscore":2,"jquery":7,"react":151,"socket.io-client":152}],198:[function(require,module,exports){
+	RoomListener.prototype = {
+		init: function(){
+			// on init, go ahead and start listening
+			app.socket.emit("joinRoom", {
+				room: this.options.room
+			});
+			app.socket.on("data", function(data){
+
+			});
+		},
+		stop: function(){
+			app.socket.emit("leaveRoom", {
+				room: this.options.room
+			});
+		}
+	};
+
+	return RoomListener;
+};
+},{}],197:[function(require,module,exports){
+var _ = require("backbone/node_modules/underscore"),
+	React = require("react"),
+	RoomListener;
+
+module.exports = function(app, Backbone){
+	return Backbone.Router.extend({
+		routes: {
+			"": "home",
+			"exchange-rate": "exchangeRate",
+			"current-block": "currentBlock"
+		},
+		initialize: function(){
+			RoomListener = require("./RoomListener")(app);
+			this.on("route", this.on_route);
+			this.on("navigate:before", this.on_beforeNavigate);
+		},
+		on_route: function(route){			
+			app.dispatcher.trigger("route", "/" + (this.currentRoute || Backbone.history.fragment) );
+			this.currentRoute = null;
+		},
+		on_beforeNavigate: function(){
+
+		},
+		home: function(route){
+			var dashboardListener = new RoomListener({
+				room: "dashboard"
+			});
+		},
+		currentBlock: function(route){
+			var dashboardListener = new RoomListener({
+				room: "current-block"
+			});
+		},
+		exchangeRate: function(route){
+			var exchangeRateListener = new RoomListener({
+				room: "exchange-rate"
+			});
+		}
+	});
+};
+
+},{"./RoomListener":196,"backbone/node_modules/underscore":2,"react":151}],198:[function(require,module,exports){
+module.exports=require(195)
+},{"./base/Router":197,"./views/page":201,"backbone":1,"backbone/node_modules/underscore":2,"jquery":7,"react":151,"socket.io-client":152}],199:[function(require,module,exports){
 /** @jsx React.DOM */
 var React = require("react");
 
+var TopNav = React.createClass({displayName: 'TopNav',
+	render: function(){
+		var navItems = {
+			"/": "Dashboard",
+			"/exchange-rate": "Exchange rate",
+			"/current-block": "Current Block"
+		},
+		nav = Object.keys(navItems).map(function(route){
+			var title = navItems[route];
+			var className = this.props.currentRoute === route ? "active" : "";
+			return (
+				React.DOM.a({href: route, title: title, className: className}, title)
+			);
+		}, this);
+
+		return (
+			React.DOM.nav(null, 
+				nav
+			)
+		);
+	},
+});
+
+module.exports = TopNav;
+},{"react":151}],200:[function(require,module,exports){
+/** @jsx React.DOM */
+var React = require("react"),
+	app = require("../app");
+
 var MainView = React.createClass({displayName: 'MainView',
+	componentWillMount: function() {
+		this.props.socket.on("data", this.ondata.bind(this));
+	},
+	componentWillUnmount: function(){
+		this.props.socket.off("data", this.ondata.bind(this));
+	},
+	ondata: function(data){
+		// view receives data here
+	},
   	render: function() {
 		if(this.props.data){
 			return this.dashboard();
@@ -38458,55 +38496,39 @@ var MainView = React.createClass({displayName: 'MainView',
 });
 
 module.exports = MainView;
-},{"react":151}],199:[function(require,module,exports){
+},{"../app":195,"react":151}],201:[function(require,module,exports){
 /** @jsx React.DOM */
 var React = require("react"),
-	MainView = require("./main");
+	MainView = require("./main"),
+	TopNav = require("./components/topnav");
 
 var PageView = React.createClass({displayName: 'PageView',
 	componentWillMount : function() {
 		this.props.dispatcher.on("route", this.onroute, this);
 	},
+	componentWillUnmount : function() {
+    	this.props.dispatcher.off("route", this.onroute, this);
+  	},
 	onroute: function(route){
 		this.setState({
 			currentRoute: route
 		});
 	},
-	componentWillUnmount : function() {
-    	this.props.router.off("route", this.onroute, this);
-  	},
   	getInitialState: function(){
   		return {
-  			route: "/",
-  			data: []
+  			route: "/"
   		};
   	},
   	render: function() {
-		var navItems = {
-			"/": "Dashboard",
-			"/exchange-rate": "Exchange rate",
-			"/current-block": "Current Block"
-		},
-		nav = Object.keys(navItems).map(function(route){
-			var title = navItems[route];
-			var className = this.state.currentRoute === route ? "active" : "";
-			return (
-				React.DOM.a({href: route, title: title, className: className}, title)
-			);
-
-		}, this);
-
 		return (
 			React.DOM.section({className: "wrapper"}, 
 				React.DOM.header(null, 
 					React.DOM.a({id: "logo", href: "/"}, 
 						"Blockchain", React.DOM.span({className: "highlight"}, " Realtime")
 					), 
-					React.DOM.nav(null, 
-						nav
-					)
+					TopNav({currentRoute: this.state.currentRoute})
 				), 
-				MainView(null), 
+				MainView({dispatcher: this.props.dispatcher, socket: this.props.socket}), 
 				React.DOM.footer(null, 
 					React.DOM.nav(null, 
 						React.DOM.a({href: "https://github.com/codyrushing/btc-streaming-data", target: "_blank"}, "Github")
@@ -38519,4 +38541,4 @@ var PageView = React.createClass({displayName: 'PageView',
 
 module.exports = PageView;
 
-},{"./main":198,"react":151}]},{},[197])
+},{"./components/topnav":199,"./main":200,"react":151}]},{},[198])

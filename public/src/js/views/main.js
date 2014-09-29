@@ -1,7 +1,17 @@
 /** @jsx React.DOM */
-var React = require("react");
+var React = require("react"),
+	app = require("../app");
 
 var MainView = React.createClass({displayName: 'MainView',
+	componentWillMount: function() {
+		this.props.socket.on("data", this.ondata.bind(this));
+	},
+	componentWillUnmount: function(){
+		this.props.socket.off("data", this.ondata.bind(this));
+	},
+	ondata: function(data){
+		// view receives data here
+	},
   	render: function() {
 		if(this.props.data){
 			return this.dashboard();

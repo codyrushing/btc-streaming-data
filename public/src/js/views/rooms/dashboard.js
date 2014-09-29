@@ -2,6 +2,9 @@
 var React = require("react");
 
 var MainView = React.createClass({displayName: 'MainView',
+	componentWillMount : function() {
+		this.props.dispatcher.on("route", this.onroute, this);
+	},
   	render: function() {
 		if(this.props.data){
 			return this.dashboard();

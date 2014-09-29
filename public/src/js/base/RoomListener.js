@@ -12,8 +12,7 @@ module.exports = function(app){
 				room: this.options.room
 			});
 			app.socket.on("data", function(data){
-				console.log("got data:");
-				console.log(data);
+
 			});
 		},
 		stop: function(){

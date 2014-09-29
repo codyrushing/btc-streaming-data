@@ -20,6 +20,7 @@ var app = {
 		this.socketConnect();
 		this.initRouter();
 		$(this.domReady.bind(this));
+		return this;
 	},
 	socketConnect: function(){
 		this.fullHost = window.location.protocol + "//" + window.location.host;
@@ -27,7 +28,7 @@ var app = {
 	},
 	domReady: function(){
 		React.renderComponent(
-			pageView({router: this.router, dispatcher: this.dispatcher}),
+			pageView({dispatcher: this.dispatcher, socket: this.socket}),
 			document.body
     	);
 
@@ -64,4 +65,4 @@ var app = {
 	}
 };
 
-app.init();
+module.exports = app.init();
