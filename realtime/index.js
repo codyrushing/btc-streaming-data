@@ -3,7 +3,7 @@ var fs = require("fs"),
 
 module.exports = (function(){
 	var realtime = {
-		init: function(httpServer){
+		init: function(httpServer, db){
 			this.io = require("socket.io")(httpServer);
 			this.buildRooms();
 			this.io.on("connection", this.on_connect.bind(this));
@@ -43,11 +43,11 @@ module.exports = (function(){
 				socket.leave(data.room);
 			}
 		},
-		buildRooms: function(){
+		buildRooms: function(db){
 			var self = this;
 			this.rooms = {};
 			require("./rooms").forEach(function(file, i){	
-				self.rooms[file] = require("./rooms/" + file)(self.io);
+				self.rooms[file] = require("./rooms/" + file)(self.io, db);
 			});
 		}
 	};

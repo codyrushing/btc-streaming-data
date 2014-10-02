@@ -10,7 +10,8 @@
     "start": "node app.js"
   },
   "dependencies": {
-    "gulp-browserify": "^0.5.0"
+    "gulp-browserify": "^0.5.0",
+    "mongodb": "~1.4.17"
   },
   "devDependencies": {
     "gulp-nodemon": "~1.0.4",

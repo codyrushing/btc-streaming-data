@@ -1,7 +1,7 @@
 var Room = require("./Room"),
 	_ = require("lodash");
 
-var IntervalRoom = function(io, options){
+var IntervalRoom = function(io, db, options){
 	options = _.defaults(options, {
 		interval: 10 * 1000,
 		cacheInterval: 60 * 1000 * 15

@@ -7,12 +7,6 @@ var http = require("http"),
 	port = process.env.PORT || 3000,
 	server;
 
-/*
-* Connect to database
-* remove if not needed
-*/
-//require("./db-connect").connect(config);
-
 /* 
 * main request handler
 */
@@ -24,7 +18,10 @@ server = http.createServer(function(req, res){
 	});
 });
 
-require("./realtime")(server);
+/*
+* Connect to database
+*/
+require("./db-connect")(server);
 
 /* 
 * Start listening 

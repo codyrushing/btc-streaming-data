@@ -14,8 +14,8 @@ var loop = function(){
 	});
 };
 
-module.exports = function(io){
-	return new IntervalRoom(io, {
+module.exports = function(io, db){
+	return new IntervalRoom(io, db, {
 		roomName: roomName,
 		interval: 60 * 1000 * 15,
 		cacheInterval: 60 * 1000 * 15,

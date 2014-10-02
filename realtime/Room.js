@@ -1,8 +1,9 @@
 var _ = require("lodash"),
 	medianRange = require("../util/medianRange");
 
-var Room = function(io, options){
+var Room = function(io, db, options){
 	this.io = io;
+	this.db = db;
 
 	this.options = _.defaults(options, {
 		medianLength: 10
@@ -33,7 +34,7 @@ Room.prototype = {
 		this.updateRoomStatus();
 		socket.emit("data", this.medianRange);
 	},
-	// called only when client emits custom "joinRoom" event
+	// called only when client emits custom "leave" event
 	on_leave: function(socket){
 		console.log("socket with id %s has left the room", socket.id);
 		this.updateRoomStatus();

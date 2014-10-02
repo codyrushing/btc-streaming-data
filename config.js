@@ -1,12 +1,14 @@
-module.exports = {
+var configs = {
 	development: {
-		db: "mongodb://localhost/dbName",
+		db: "localhost/blockchain_realtime",
 		dbUser: null,
 		dbPwd: null
 	},
 	production: {
-		db: "mongodb://localhost/dbName",
+		db: "localhost/blockchain_realtime",
 		dbUser: "dbUserName",
 		dbPwd: "dbPassword"
 	}
 };
+
+module.exports = configs[process.env.NODE_ENV ? process.env.NODE_ENV : "development"];

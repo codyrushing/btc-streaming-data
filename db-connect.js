@@ -1,12 +1,24 @@
-var mongoose = require("mongoose");
-module.exports = {
-	connect: function(config){
-		mongoose.connect(config.db, {user: config.dbUser, pass: config.dbPwd});
-		mongoose.connection.on("error", function(){
-			console.log("There was an error connecting to the database");
-		});
-		mongoose.connection.once("open", function(){
-			console.log("connected to " +config.db+" successfully!");
-		});
+var mongodb = require("mongodb"),
+	config = require("./config"),
+	connectArr = [];
+
+module.exports = function(server){
+	connectArr.push("mongodb://")
+	if(config.dbUser){
+		connectArr.push(config.dbUser);
+		connectArr.push("@")
 	}
+	if(config.dbPwd){
+		connectArr.push(config.dbPwd);
+	}
+	connectArr.push(config.db);
+
+	mongodb.MongoClient.connect(connectArr.join(""), function(err, db){
+		if(err) {
+			console.log("error connecting to mongo");
+		} else {
+			console.log("connected to %s successfully", db.databaseName);
+			require("./realtime")(server, db);
+		}
+	});	
 };
