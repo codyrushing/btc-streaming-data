@@ -38370,8 +38370,8 @@ module.exports = function(app){
 				room: this.options.room
 			});
 			app.socket.on("data", function(data){
-
-			});
+				app.dispatcher.trigger("data", data);
+			}.bind(this));
 		},
 		stop: function(){
 			app.socket.emit("leaveRoom", {
@@ -38461,13 +38461,14 @@ var React = require("react"),
 
 var MainView = React.createClass({displayName: 'MainView',
 	componentWillMount: function() {
-		this.props.socket.on("data", this.ondata.bind(this));
+		this.props.dispatcher.on("data", this.ondata.bind(this));
 	},
 	componentWillUnmount: function(){
-		this.props.socket.off("data", this.ondata.bind(this));
+		this.props.dispatcher.off("data", this.ondata.bind(this));
 	},
 	ondata: function(data){
-		// view receives data here
+		console.log("woo, got some data in the main view");
+		console.log(data);
 	},
   	render: function() {
 		if(this.props.data){
@@ -38528,7 +38529,7 @@ var PageView = React.createClass({displayName: 'PageView',
 					), 
 					TopNav({currentRoute: this.state.currentRoute})
 				), 
-				MainView({dispatcher: this.props.dispatcher, socket: this.props.socket}), 
+				MainView({dispatcher: this.props.dispatcher}), 
 				React.DOM.footer(null, 
 					React.DOM.nav(null, 
 						React.DOM.a({href: "https://github.com/codyrushing/btc-streaming-data", target: "_blank"}, "Github")

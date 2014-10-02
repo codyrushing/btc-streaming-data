@@ -3,13 +3,14 @@ var React = require("react"),
 
 var MainView = React.createClass({
 	componentWillMount: function() {
-		this.props.socket.on("data", this.ondata.bind(this));
+		this.props.dispatcher.on("data", this.ondata.bind(this));
 	},
 	componentWillUnmount: function(){
-		this.props.socket.off("data", this.ondata.bind(this));
+		this.props.dispatcher.off("data", this.ondata.bind(this));
 	},
 	ondata: function(data){
-		// view receives data here
+		console.log("woo, got some data in the main view");
+		console.log(data);
 	},
   	render: function() {
 		if(this.props.data){

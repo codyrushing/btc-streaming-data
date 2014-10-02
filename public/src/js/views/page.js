@@ -29,7 +29,7 @@ var PageView = React.createClass({displayName: 'PageView',
 					), 
 					TopNav({currentRoute: this.state.currentRoute})
 				), 
-				MainView({dispatcher: this.props.dispatcher, socket: this.props.socket}), 
+				MainView({dispatcher: this.props.dispatcher}), 
 				React.DOM.footer(null, 
 					React.DOM.nav(null, 
 						React.DOM.a({href: "https://github.com/codyrushing/btc-streaming-data", target: "_blank"}, "Github")

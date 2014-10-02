@@ -28,7 +28,7 @@ var PageView = React.createClass({
 					</a>
 					<TopNav currentRoute={this.state.currentRoute} />
 				</header>
-				<MainView dispatcher={this.props.dispatcher} socket={this.props.socket} />
+				<MainView dispatcher={this.props.dispatcher} />
 				<footer>
 					<nav>
 						<a href="https://github.com/codyrushing/btc-streaming-data" target="_blank">Github</a>

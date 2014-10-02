@@ -12,8 +12,8 @@ module.exports = function(app){
 				room: this.options.room
 			});
 			app.socket.on("data", function(data){
-
-			});
+				app.dispatcher.trigger("data", data);
+			}.bind(this));
 		},
 		stop: function(){
 			app.socket.emit("leaveRoom", {
