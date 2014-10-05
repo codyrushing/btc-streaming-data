@@ -1,9 +1,9 @@
 var IntervalRoom = require("../IntervalRoom"),
-	blockchainRequest = require("../../util/blockchainRequest"),
-	roomName = (function(){
-		var arr = __filename.split("/");
-		return arr[arr.length-1].split(".")[0];
-	})();
+	blockchainRequest = require("../../util/blockchainRequest");
+	// roomName = (function(){
+	// 	var arr = __filename.split("/");
+	// 	return arr[arr.length-1].split(".")[0];
+	// })();
 
 var loop = function(){
 	var self = this;
@@ -16,9 +16,9 @@ var loop = function(){
 	});
 };
 
-module.exports = function(io, db){
-	return new IntervalRoom(io, db, {
-		roomName: roomName,
+module.exports = function(name, dispatcher, io){
+	return new IntervalRoom(dispatcher, io, {
+		name: name,
 		interval: 30 * 1000,
 		cacheInterval: 60 * 1000 * 15,
 		on_activeLoop: loop,

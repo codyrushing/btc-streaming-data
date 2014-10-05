@@ -1,9 +1,9 @@
 var _ = require("lodash"),
-	medianRange = require("../util/medianRange");
+	RoomCache = require("./RoomCache");
 
-var Room = function(io, db, options){
+var Room = function(dispatcher, io, options){
+	this.dispatcher = dispatcher;
 	this.io = io;
-	this.db = db;
 
 	this.options = _.defaults(options, {
 		medianLength: 10
@@ -15,7 +15,7 @@ var Room = function(io, db, options){
 Room.prototype = {
 	init: function(){
 		this.initCache();
-		this.io.sockets.in(this.options.roomName)
+		this.io.sockets.in(this.options.name)
 			.on("join", this.on_join.bind(this))
 			.on("leave", this.on_join.bind(this));
 
@@ -56,7 +56,8 @@ Room.prototype = {
 		this.cachePopulator(data);
 		this.updateRoomStatus();
 		if(!this.getNumberOfListeners()) return;
-		this.io.sockets.in(this.options.roomName).emit("data", data);
+		this.io.sockets.in(this.options.name).emit("data", data);
+		this.dispatcher.emit("data:"+this.options.name, data);
 	},
 	cachePopulator: function(data){
 		// if we're at our limit, knock one off of the beginning
@@ -66,13 +67,13 @@ Room.prototype = {
 		this.cache.push(data);
 
 		// get our medianRange (sent to new sockets when they join)
-		this.medianRange = medianRange(this.cache, this.options.medianLength, function(item){
-			return item.date.getTime();
-		});
+		// this.medianRange = medianRange(this.cache, this.options.medianLength, function(item){
+		// 	return item.date.getTime();
+		// });
 
 	},
 	getNumberOfListeners: function(){		
-		return this.io.sockets.in(this.options.roomName).sockets.length;
+		return this.io.sockets.in(this.options.name).sockets.length;
 	}
 };
 

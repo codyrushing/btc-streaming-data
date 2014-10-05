@@ -1,4 +1,5 @@
 var fs = require("fs"),
+	EventEmitter = require("events").EventEmitter,
 	Room = require("./Room");
 
 module.exports = (function(){
@@ -44,11 +45,20 @@ module.exports = (function(){
 			}
 		},
 		buildRooms: function(db){
-			var self = this;
+			var self = this,
+				dispatcher = new EventEmitter();
+
+			// build rooms
 			this.rooms = {};
-			require("./rooms").forEach(function(file, i){	
-				self.rooms[file] = require("./rooms/" + file)(self.io, db);
+			require("./rooms").forEach(function(name, i){	
+				self.rooms[name] = require("./rooms/" + name)(name, dispatcher, self.io, db);
 			});
+
+			// build caches
+			require("./caches").forEach(function(name, i){	
+				require("./caches/" + name)(name, dispatcher, self.io, db);
+			});
+
 		}
 	};
 	return realtime.init.bind(realtime);

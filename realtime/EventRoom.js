@@ -1,6 +1,6 @@
 var Room = require("./Room");
 
-var EventRoom = function(options){
+var EventRoom = function(){
 	this.superType.apply(this, this.arguments);
 };
 
