@@ -1,18 +1,32 @@
-var Room = require("./Room");
+var Room = require("./Room"),
+	_ = require("lodash");
 
-var EventRoom = function(){
-	this.superType.apply(this, this.arguments);
+var EventRoom = function(dispatcher, io, options){
+	options = _.defaults(options, {
+
+	});
+	this.superType.apply(this, arguments);
 };
 
 EventRoom.prototype = _.create(Room.prototype, {
 	constructor: EventRoom,
 	superType: Room,
-	hasListeners: function(){
-
+	on_active: function(){
+		this.startListening();
 	},
-	isEmpty: function(){
-		
+	on_empty: function(){
+		this.stopListening();
+	},
+	startListening: function(){
+		if(typeof this.options.startListening === "function"){
+			this.options.startListening.call(this);
+		}
+	},
+	stopListening: function(){
+		if(typeof this.options.stopListening === "function"){
+			this.options.stopListening.call(this);
+		}
 	}
 });
 
-return EventRoom;
+module.exports = EventRoom;

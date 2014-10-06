@@ -6,7 +6,8 @@ var TopNav = React.createClass({displayName: 'TopNav',
 		var navItems = {
 			"/": "Dashboard",
 			"/exchange-rate": "Exchange rate",
-			"/current-block": "Current Block"
+			"/current-block": "Current Block",
+			"/transactions": "Transactions"
 		},
 		nav = Object.keys(navItems).map(function(route){
 			var title = navItems[route];

@@ -7,7 +7,8 @@ module.exports = function(app, Backbone){
 		routes: {
 			"": "home",
 			"exchange-rate": "exchangeRate",
-			"current-block": "currentBlock"
+			"current-block": "currentBlock",
+			"transactions": "transactions"
 		},
 		initialize: function(){
 			RoomListener = require("./RoomListener")(app);
@@ -34,6 +35,11 @@ module.exports = function(app, Backbone){
 		exchangeRate: function(route){
 			var exchangeRateListener = new RoomListener({
 				room: "exchange-rate"
+			});
+		},
+		transactions: function(route){
+			var transactionListener = new RoomListener({
+				room: "transactions"
 			});
 		}
 	});

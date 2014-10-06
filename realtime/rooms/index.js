@@ -1,1 +1,1 @@
-module.exports = ["dashboard", "exchange-rate"];
+module.exports = ["dashboard", "exchange-rate", "transactions"];

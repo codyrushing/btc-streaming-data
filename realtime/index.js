@@ -6,7 +6,7 @@ module.exports = (function(){
 	var realtime = {
 		init: function(httpServer, db){
 			this.io = require("socket.io")(httpServer);
-			this.buildRooms();
+			this.buildRooms(db);
 			this.io.on("connection", this.on_connect.bind(this));
 			return this;
 		},
@@ -56,7 +56,7 @@ module.exports = (function(){
 
 			// build caches
 			require("./caches").forEach(function(name, i){	
-				require("./caches/" + name)(name, dispatcher, self.io, db);
+				require("./caches/" + name)(name, dispatcher, db);
 			});
 
 		}

@@ -14,7 +14,7 @@ var Room = function(dispatcher, io, options){
 
 Room.prototype = {
 	init: function(){
-		this.initCache();
+		//this.initCache();
 		this.io.sockets.in(this.options.name)
 			.on("join", this.on_join.bind(this))
 			.on("leave", this.on_join.bind(this));
@@ -51,9 +51,9 @@ Room.prototype = {
 	},
 	on_data: function(data){
 		if(!data.date){
-			data.date = new Date();
+			data.date = new Date().getTime();
 		}
-		this.cachePopulator(data);
+		//this.cachePopulator(data);
 		this.updateRoomStatus();
 		if(!this.getNumberOfListeners()) return;
 		this.io.sockets.in(this.options.name).emit("data", data);
