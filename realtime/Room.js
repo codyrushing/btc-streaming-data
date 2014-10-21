@@ -51,7 +51,7 @@ Room.prototype = {
 	},
 	on_data: function(data){
 		if(!data.date){
-			data.date = new Date().getTime();
+			data.date = new Date();
 		}
 		//this.cachePopulator(data);
 		this.updateRoomStatus();

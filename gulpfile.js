@@ -1,5 +1,6 @@
 var gulp = require("gulp"),
 	gulpif = require("gulp-if"),
+	changed = require("gulp-changed"),
 	nodemon = require("gulp-nodemon"),
 	plumber = require("gulp-plumber"),
 	compass = require("gulp-compass"),
@@ -33,7 +34,8 @@ gulp.task("react", function(){
 
 gulp.task("scripts", function(){
 	// jshint all js
-	gulp.src(paths.src.js + "**/*.js")
+	gulp.src("**/*.js", "!"+paths.dest.js, "!node_modules/")
+		.pipe(changed("./"))
 		.pipe(plumber())
 		.pipe(jshint())
 		.pipe(jshint.reporter("jshint-stylish"));

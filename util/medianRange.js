@@ -4,7 +4,7 @@ var _ = require("lodash");
 takes an array, and returns a representative median array of values
 @param arr (array) : data from which to pull range values
 @param rangeSize (integer) : size of range that we want to return
-@param getValue (function) : function that we use to determine how to the array
+@param getValue (function) : function that we use to determine how to sort the array
 */
 
 module.exports = function(arr, rangeSize, getValue){

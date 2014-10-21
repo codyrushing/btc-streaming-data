@@ -3,10 +3,10 @@ var mongodb = require("mongodb"),
 	connectArr = [];
 
 module.exports = function(server){
-	connectArr.push("mongodb://")
+	connectArr.push("mongodb://");
 	if(config.dbUser){
 		connectArr.push(config.dbUser);
-		connectArr.push("@")
+		connectArr.push("@");
 	}
 	if(config.dbPwd){
 		connectArr.push(config.dbPwd);
