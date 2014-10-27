@@ -23,8 +23,9 @@
     "test",
     "tests"
   ],
-  "dependencies": {
-
-  },
-  "devDependencies": {}
+  "main": "app.js",
+  "devDependencies": {
+    "normalize-scss": "~3.0.1",
+    "susy": "~2.1.3"
+  }
 }

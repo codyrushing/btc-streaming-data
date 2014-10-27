@@ -3,10 +3,12 @@ var gulp = require("gulp"),
 	changed = require("gulp-changed"),
 	nodemon = require("gulp-nodemon"),
 	plumber = require("gulp-plumber"),
-	compass = require("gulp-compass"),
 	react = require("gulp-react"),
 	browserify = require("gulp-browserify"),
 	jshint = require("gulp-jshint"),
+	// version of libsass used by gulp-sass is incompatible with susy, so we use gulp-ruby-sass
+	sass = require("gulp-ruby-sass"),
+	sassSourcemaps = require("gulp-sourcemaps"),
 	path = require("path");
 	paths = {
 		src: {
@@ -57,14 +59,6 @@ ulimit -n 2560
 TO YOUR .bash_profile, otherwise browserify will fail
 */
 
-gulp.task("browserify", function(){
-	// then browserify it
-	gulp.src(paths.src.js + "app.js")
-		.pipe(plumber())
-		.pipe(browserify())
-		.pipe( gulp.dest( paths.dest.js ) );
-});
-
 gulp.task("server", function(){
 	nodemon({	
 		script: "app.js",
@@ -77,22 +71,21 @@ gulp.task("server", function(){
 	}			
 });
 
-gulp.task("compass", function(){
+gulp.task("sass", function(){
 	gulp.src(paths.src.sass + "*.scss")
 		.pipe(plumber())
-		.pipe(compass({
-			project: path.join(__dirname, "public"),
-			sass: "src/sass",
-			config_file: "./config.rb"
-		}))
-		.pipe(gulp.dest( paths.dest.css ))
+		.pipe(sassSourcemaps.init())
+		.pipe(
+			sass({loadPath: ["bower_components"], require: "susy"})
+		)
+		.pipe(gulp.dest( paths.dest.css ));
 });
 
 gulp.task("watch", function(){
 	gulp.watch([paths.src.views + "**/*.jsx"], ["react"]);
 	gulp.watch([paths.src.js + "**/*.js"], ["scripts"]);
-	gulp.watch([paths.src.sass + "**/*.scss"], ["compass"]);
+	gulp.watch([paths.src.sass + "**/*.scss"], ["sass"]);
 	gulp.watch(["gulpfile.js"], ["dev"]);
 });
 
-gulp.task("dev", ["server", "react", "scripts", "compass", "watch"]);
+gulp.task("dev", ["server", "react", "scripts", "sass", "watch"]);

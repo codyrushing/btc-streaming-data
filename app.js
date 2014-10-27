@@ -4,7 +4,7 @@ var http = require("http"),
 	publicDir = "public",
 	publicFilePath = __dirname + "/" + publicDir,	
 	serveStatic = require("serve-static")(publicDir),
-	port = process.env.PORT || 3000,
+	port = process.env.PORT || 3003,
 	server;
 
 /* 

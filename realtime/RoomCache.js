@@ -135,6 +135,7 @@ RoomCache.prototype = {
 							ascSort[range.field] = 1;
 							
 							baseQuery.sort(ascSort).limit(1).toArray(function(err, items){
+								console.log("min _id = %s", items[0]._id);
 								cb(err, baseQuery.rewind(), items[0][range.field]);
 							});
 						} else {
@@ -147,13 +148,14 @@ RoomCache.prototype = {
 						descSort[range.field] = -1;
 
 						baseQuery.sort(descSort).limit(1).toArray(function(err, items){
+							console.log("max _id = %s", items[0]._id);
 							cb(err, baseQuery.rewind(), minValue, items[0][range.field]);
 						});
 					},
 					function(baseQuery, minValue, maxValue, cb){
 						var dataRange = maxValue - minValue,
 							pointInterval = dataRange / range.size-1,
-							i,
+							i = 0,
 							stream = baseQuery.stream();
 
 						stream.on("data", function(data){

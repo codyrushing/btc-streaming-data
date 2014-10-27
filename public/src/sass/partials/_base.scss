@@ -1,7 +1,13 @@
-@import "compass/utilities/general/clearfix";
-
 $spacing: 1em;
 $text-color-on-dark: #fff; //#ededed;
 
 $primary-color: #20598F;
 $secondary-color: #F7931A;
+
+@mixin clearfix() {
+	&:after {
+		content: "";
+		display: table;
+		clear: both;
+	}
+}
