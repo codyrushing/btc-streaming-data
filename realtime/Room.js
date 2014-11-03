@@ -1,5 +1,4 @@
-var _ = require("lodash"),
-	RoomCache = require("./RoomCache");
+var _ = require("lodash");
 
 var Room = function(dispatcher, io, options){
 	this.dispatcher = dispatcher;
@@ -32,7 +31,8 @@ Room.prototype = {
 	// called only when client emits custom "joinRoom" event
 	on_join: function(socket){
 		this.updateRoomStatus();
-		socket.emit("data", this.medianRange);
+		this.dispatcher.emit("join:" + this.options.name, socket);
+		//socket.emit("data", this.medianRange);
 	},
 	// called only when client emits custom "leave" event
 	on_leave: function(socket){
@@ -53,24 +53,10 @@ Room.prototype = {
 		if(!data.date){
 			data.date = new Date();
 		}
-		//this.cachePopulator(data);
 		this.updateRoomStatus();
 		if(!this.getNumberOfListeners()) return;
 		this.io.sockets.in(this.options.name).emit("data", data);
 		this.dispatcher.emit("data:"+this.options.name, data);
-	},
-	cachePopulator: function(data){
-		// if we're at our limit, knock one off of the beginning
-		if(this.cache.length === this.maxCacheLength) this.cache.shift();
-
-		// add data
-		this.cache.push(data);
-
-		// get our medianRange (sent to new sockets when they join)
-		// this.medianRange = medianRange(this.cache, this.options.medianLength, function(item){
-		// 	return item.date.getTime();
-		// });
-
 	},
 	getNumberOfListeners: function(){		
 		return this.io.sockets.in(this.options.name).sockets.length;
