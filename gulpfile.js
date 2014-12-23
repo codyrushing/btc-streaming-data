@@ -1,6 +1,7 @@
 var gulp = require("gulp"),
 	gulpif = require("gulp-if"),
 	changed = require("gulp-changed"),
+	runSequence = require("run-sequence"),
 	nodemon = require("gulp-nodemon"),
 	plumber = require("gulp-plumber"),
 	react = require("gulp-react"),
@@ -28,22 +29,27 @@ var gulp = require("gulp"),
 
 // precompile all jsx -> js
 gulp.task("react", function(){
-	gulp.src(paths.src.views + "**/*.jsx")
+	return gulp.src(paths.src.views + "**/*.jsx")
 		.pipe(plumber())
 		.pipe(react())
 		.pipe( gulp.dest(paths.dest.views) );
 });
 
-gulp.task("scripts", function(){
+gulp.task("scripts", ["jshint"], function(){
+	return gulp.start("browserify");
+});
+
+gulp.task("jshint", function(){
 	// jshint all js
-	gulp.src("**/*.js", "!"+paths.dest.js, "!node_modules/")
+	return gulp.src("**/*.js", "!"+paths.dest.js, "!node_modules/")
 		.pipe(changed("./"))
 		.pipe(plumber())
 		.pipe(jshint())
-		.pipe(jshint.reporter("jshint-stylish"));
+		.pipe(jshint.reporter("jshint-stylish"));	
+});
 
-	// then browserify it
-	gulp.src(paths.src.js + "app.js")
+gulp.task("browserify", function(){
+	return gulp.src(paths.src.js + "app.js")
 		.pipe(plumber())
 		.pipe(browserify())
 		.pipe( gulp.dest( paths.dest.js ) );
@@ -60,21 +66,29 @@ TO YOUR .bash_profile, otherwise browserify will fail
 */
 
 gulp.task("server", function(){
-	nodemon({	
+	var r;
+
+	require("child_process").exec("mongod --noauth");
+
+	r = nodemon({	
 		script: "app.js",
 		ext: "js",
 		nodeArgs: nodeArgs,
 		ignore: ["public/", "gulpfile.js"]
 	});
-	if(nodeArgs.length){
+
+	if(nodeArgs){		
 		require("child_process").spawn("node-inspector");
-	}			
+		require("child_process").spawn("open", ["http://localhost:8080/debug?port=5858"]);
+	}
+
+	return r;
+
 });
 
 gulp.task("sass", function(){
 	gulp.src(paths.src.sass + "*.scss")
 		.pipe(plumber())
-		.pipe(sassSourcemaps.init())
 		.pipe(
 			sass({loadPath: ["bower_components"], require: "susy"})
 		)
@@ -83,7 +97,7 @@ gulp.task("sass", function(){
 
 gulp.task("watch", function(){
 	gulp.watch([paths.src.views + "**/*.jsx"], ["react"]);
-	gulp.watch([paths.src.js + "**/*.js"], ["scripts"]);
+	gulp.watch([paths.src.js + "**/*.js", "!gulpfile.js"], ["scripts"]);
 	gulp.watch([paths.src.sass + "**/*.scss"], ["sass"]);
 	gulp.watch(["gulpfile.js"], ["dev"]);
 });
