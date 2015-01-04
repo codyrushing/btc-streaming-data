@@ -29,9 +29,9 @@ Room.prototype = {
 		this.maxCacheLength = Math.round(this.options.cacheInterval * this.options.medianLength / this.options.interval);
 	},
 	// called only when client emits custom "joinRoom" event
-	on_join: function(socket){
+	on_join: function(socket, data){
 		this.updateRoomStatus();
-		this.dispatcher.emit("join:" + this.options.name, socket);
+		this.dispatcher.emit("join:" + this.options.name, socket, data);
 		//socket.emit("data", this.medianRange);
 	},
 	// called only when client emits custom "leave" event

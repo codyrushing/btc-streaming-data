@@ -1609,7 +1609,7 @@
 }));
 
 },{"underscore":2}],2:[function(require,module,exports){
-//     Underscore.js 1.7.0
+//     Underscore.js 1.6.0
 //     http://underscorejs.org
 //     (c) 2009-2014 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
 //     Underscore may be freely distributed under the MIT license.
@@ -1625,6 +1625,9 @@
   // Save the previous value of the `_` variable.
   var previousUnderscore = root._;
 
+  // Establish the object that gets returned to break out of a loop iteration.
+  var breaker = {};
+
   // Save bytes in the minified (but not gzipped) version:
   var ArrayProto = Array.prototype, ObjProto = Object.prototype, FuncProto = Function.prototype;
 
@@ -1639,6 +1642,15 @@
   // All **ECMAScript 5** native function implementations that we hope to use
   // are declared here.
   var
+    nativeForEach      = ArrayProto.forEach,
+    nativeMap          = ArrayProto.map,
+    nativeReduce       = ArrayProto.reduce,
+    nativeReduceRight  = ArrayProto.reduceRight,
+    nativeFilter       = ArrayProto.filter,
+    nativeEvery        = ArrayProto.every,
+    nativeSome         = ArrayProto.some,
+    nativeIndexOf      = ArrayProto.indexOf,
+    nativeLastIndexOf  = ArrayProto.lastIndexOf,
     nativeIsArray      = Array.isArray,
     nativeKeys         = Object.keys,
     nativeBind         = FuncProto.bind;
@@ -1652,7 +1664,8 @@
 
   // Export the Underscore object for **Node.js**, with
   // backwards-compatibility for the old `require()` API. If we're in
-  // the browser, add `_` as a global object.
+  // the browser, add `_` as a global object via a string identifier,
+  // for Closure Compiler "advanced" mode.
   if (typeof exports !== 'undefined') {
     if (typeof module !== 'undefined' && module.exports) {
       exports = module.exports = _;
@@ -1663,125 +1676,98 @@
   }
 
   // Current version.
-  _.VERSION = '1.7.0';
-
-  // Internal function that returns an efficient (for current engines) version
-  // of the passed-in callback, to be repeatedly applied in other Underscore
-  // functions.
-  var createCallback = function(func, context, argCount) {
-    if (context === void 0) return func;
-    switch (argCount == null ? 3 : argCount) {
-      case 1: return function(value) {
-        return func.call(context, value);
-      };
-      case 2: return function(value, other) {
-        return func.call(context, value, other);
-      };
-      case 3: return function(value, index, collection) {
-        return func.call(context, value, index, collection);
-      };
-      case 4: return function(accumulator, value, index, collection) {
-        return func.call(context, accumulator, value, index, collection);
-      };
-    }
-    return function() {
-      return func.apply(context, arguments);
-    };
-  };
-
-  // A mostly-internal function to generate callbacks that can be applied
-  // to each element in a collection, returning the desired result — either
-  // identity, an arbitrary callback, a property matcher, or a property accessor.
-  _.iteratee = function(value, context, argCount) {
-    if (value == null) return _.identity;
-    if (_.isFunction(value)) return createCallback(value, context, argCount);
-    if (_.isObject(value)) return _.matches(value);
-    return _.property(value);
-  };
+  _.VERSION = '1.6.0';
 
   // Collection Functions
   // --------------------
 
   // The cornerstone, an `each` implementation, aka `forEach`.
-  // Handles raw objects in addition to array-likes. Treats all
-  // sparse array-likes as if they were dense.
-  _.each = _.forEach = function(obj, iteratee, context) {
+  // Handles objects with the built-in `forEach`, arrays, and raw objects.
+  // Delegates to **ECMAScript 5**'s native `forEach` if available.
+  var each = _.each = _.forEach = function(obj, iterator, context) {
     if (obj == null) return obj;
-    iteratee = createCallback(iteratee, context);
-    var i, length = obj.length;
-    if (length === +length) {
-      for (i = 0; i < length; i++) {
-        iteratee(obj[i], i, obj);
+    if (nativeForEach && obj.forEach === nativeForEach) {
+      obj.forEach(iterator, context);
+    } else if (obj.length === +obj.length) {
+      for (var i = 0, length = obj.length; i < length; i++) {
+        if (iterator.call(context, obj[i], i, obj) === breaker) return;
       }
     } else {
       var keys = _.keys(obj);
-      for (i = 0, length = keys.length; i < length; i++) {
-        iteratee(obj[keys[i]], keys[i], obj);
+      for (var i = 0, length = keys.length; i < length; i++) {
+        if (iterator.call(context, obj[keys[i]], keys[i], obj) === breaker) return;
       }
     }
     return obj;
   };
 
-  // Return the results of applying the iteratee to each element.
-  _.map = _.collect = function(obj, iteratee, context) {
-    if (obj == null) return [];
-    iteratee = _.iteratee(iteratee, context);
-    var keys = obj.length !== +obj.length && _.keys(obj),
-        length = (keys || obj).length,
-        results = Array(length),
-        currentKey;
-    for (var index = 0; index < length; index++) {
-      currentKey = keys ? keys[index] : index;
-      results[index] = iteratee(obj[currentKey], currentKey, obj);
-    }
+  // Return the results of applying the iterator to each element.
+  // Delegates to **ECMAScript 5**'s native `map` if available.
+  _.map = _.collect = function(obj, iterator, context) {
+    var results = [];
+    if (obj == null) return results;
+    if (nativeMap && obj.map === nativeMap) return obj.map(iterator, context);
+    each(obj, function(value, index, list) {
+      results.push(iterator.call(context, value, index, list));
+    });
     return results;
   };
 
   var reduceError = 'Reduce of empty array with no initial value';
 
   // **Reduce** builds up a single result from a list of values, aka `inject`,
-  // or `foldl`.
-  _.reduce = _.foldl = _.inject = function(obj, iteratee, memo, context) {
+  // or `foldl`. Delegates to **ECMAScript 5**'s native `reduce` if available.
+  _.reduce = _.foldl = _.inject = function(obj, iterator, memo, context) {
+    var initial = arguments.length > 2;
     if (obj == null) obj = [];
-    iteratee = createCallback(iteratee, context, 4);
-    var keys = obj.length !== +obj.length && _.keys(obj),
-        length = (keys || obj).length,
-        index = 0, currentKey;
-    if (arguments.length < 3) {
-      if (!length) throw new TypeError(reduceError);
-      memo = obj[keys ? keys[index++] : index++];
+    if (nativeReduce && obj.reduce === nativeReduce) {
+      if (context) iterator = _.bind(iterator, context);
+      return initial ? obj.reduce(iterator, memo) : obj.reduce(iterator);
     }
-    for (; index < length; index++) {
-      currentKey = keys ? keys[index] : index;
-      memo = iteratee(memo, obj[currentKey], currentKey, obj);
-    }
+    each(obj, function(value, index, list) {
+      if (!initial) {
+        memo = value;
+        initial = true;
+      } else {
+        memo = iterator.call(context, memo, value, index, list);
+      }
+    });
+    if (!initial) throw new TypeError(reduceError);
     return memo;
   };
 
   // The right-associative version of reduce, also known as `foldr`.
-  _.reduceRight = _.foldr = function(obj, iteratee, memo, context) {
+  // Delegates to **ECMAScript 5**'s native `reduceRight` if available.
+  _.reduceRight = _.foldr = function(obj, iterator, memo, context) {
+    var initial = arguments.length > 2;
     if (obj == null) obj = [];
-    iteratee = createCallback(iteratee, context, 4);
-    var keys = obj.length !== + obj.length && _.keys(obj),
-        index = (keys || obj).length,
-        currentKey;
-    if (arguments.length < 3) {
-      if (!index) throw new TypeError(reduceError);
-      memo = obj[keys ? keys[--index] : --index];
+    if (nativeReduceRight && obj.reduceRight === nativeReduceRight) {
+      if (context) iterator = _.bind(iterator, context);
+      return initial ? obj.reduceRight(iterator, memo) : obj.reduceRight(iterator);
     }
-    while (index--) {
-      currentKey = keys ? keys[index] : index;
-      memo = iteratee(memo, obj[currentKey], currentKey, obj);
+    var length = obj.length;
+    if (length !== +length) {
+      var keys = _.keys(obj);
+      length = keys.length;
     }
+    each(obj, function(value, index, list) {
+      index = keys ? keys[--length] : --length;
+      if (!initial) {
+        memo = obj[index];
+        initial = true;
+      } else {
+        memo = iterator.call(context, memo, obj[index], index, list);
+      }
+    });
+    if (!initial) throw new TypeError(reduceError);
     return memo;
   };
 
   // Return the first value which passes a truth test. Aliased as `detect`.
   _.find = _.detect = function(obj, predicate, context) {
     var result;
-    predicate = _.iteratee(predicate, context);
-    _.some(obj, function(value, index, list) {
-      if (predicate(value, index, list)) {
+    any(obj, function(value, index, list) {
+      if (predicate.call(context, value, index, list)) {
         result = value;
         return true;
       }
@@ -1790,58 +1776,61 @@
   };
 
   // Return all the elements that pass a truth test.
+  // Delegates to **ECMAScript 5**'s native `filter` if available.
   // Aliased as `select`.
   _.filter = _.select = function(obj, predicate, context) {
     var results = [];
     if (obj == null) return results;
-    predicate = _.iteratee(predicate, context);
-    _.each(obj, function(value, index, list) {
-      if (predicate(value, index, list)) results.push(value);
+    if (nativeFilter && obj.filter === nativeFilter) return obj.filter(predicate, context);
+    each(obj, function(value, index, list) {
+      if (predicate.call(context, value, index, list)) results.push(value);
     });
     return results;
   };
 
   // Return all the elements for which a truth test fails.
   _.reject = function(obj, predicate, context) {
-    return _.filter(obj, _.negate(_.iteratee(predicate)), context);
+    return _.filter(obj, function(value, index, list) {
+      return !predicate.call(context, value, index, list);
+    }, context);
   };
 
   // Determine whether all of the elements match a truth test.
+  // Delegates to **ECMAScript 5**'s native `every` if available.
   // Aliased as `all`.
   _.every = _.all = function(obj, predicate, context) {
-    if (obj == null) return true;
-    predicate = _.iteratee(predicate, context);
-    var keys = obj.length !== +obj.length && _.keys(obj),
-        length = (keys || obj).length,
-        index, currentKey;
-    for (index = 0; index < length; index++) {
-      currentKey = keys ? keys[index] : index;
-      if (!predicate(obj[currentKey], currentKey, obj)) return false;
-    }
-    return true;
+    predicate || (predicate = _.identity);
+    var result = true;
+    if (obj == null) return result;
+    if (nativeEvery && obj.every === nativeEvery) return obj.every(predicate, context);
+    each(obj, function(value, index, list) {
+      if (!(result = result && predicate.call(context, value, index, list))) return breaker;
+    });
+    return !!result;
   };
 
   // Determine if at least one element in the object matches a truth test.
+  // Delegates to **ECMAScript 5**'s native `some` if available.
   // Aliased as `any`.
-  _.some = _.any = function(obj, predicate, context) {
-    if (obj == null) return false;
-    predicate = _.iteratee(predicate, context);
-    var keys = obj.length !== +obj.length && _.keys(obj),
-        length = (keys || obj).length,
-        index, currentKey;
-    for (index = 0; index < length; index++) {
-      currentKey = keys ? keys[index] : index;
-      if (predicate(obj[currentKey], currentKey, obj)) return true;
-    }
-    return false;
+  var any = _.some = _.any = function(obj, predicate, context) {
+    predicate || (predicate = _.identity);
+    var result = false;
+    if (obj == null) return result;
+    if (nativeSome && obj.some === nativeSome) return obj.some(predicate, context);
+    each(obj, function(value, index, list) {
+      if (result || (result = predicate.call(context, value, index, list))) return breaker;
+    });
+    return !!result;
   };
 
   // Determine if the array or object contains a given value (using `===`).
   // Aliased as `include`.
   _.contains = _.include = function(obj, target) {
     if (obj == null) return false;
-    if (obj.length !== +obj.length) obj = _.values(obj);
-    return _.indexOf(obj, target) >= 0;
+    if (nativeIndexOf && obj.indexOf === nativeIndexOf) return obj.indexOf(target) != -1;
+    return any(obj, function(value) {
+      return value === target;
+    });
   };
 
   // Invoke a method (with arguments) on every item in a collection.
@@ -1870,67 +1859,51 @@
     return _.find(obj, _.matches(attrs));
   };
 
-  // Return the maximum element (or element-based computation).
-  _.max = function(obj, iteratee, context) {
-    var result = -Infinity, lastComputed = -Infinity,
-        value, computed;
-    if (iteratee == null && obj != null) {
-      obj = obj.length === +obj.length ? obj : _.values(obj);
-      for (var i = 0, length = obj.length; i < length; i++) {
-        value = obj[i];
-        if (value > result) {
-          result = value;
-        }
-      }
-    } else {
-      iteratee = _.iteratee(iteratee, context);
-      _.each(obj, function(value, index, list) {
-        computed = iteratee(value, index, list);
-        if (computed > lastComputed || computed === -Infinity && result === -Infinity) {
-          result = value;
-          lastComputed = computed;
-        }
-      });
+  // Return the maximum element or (element-based computation).
+  // Can't optimize arrays of integers longer than 65,535 elements.
+  // See [WebKit Bug 80797](https://bugs.webkit.org/show_bug.cgi?id=80797)
+  _.max = function(obj, iterator, context) {
+    if (!iterator && _.isArray(obj) && obj[0] === +obj[0] && obj.length < 65535) {
+      return Math.max.apply(Math, obj);
     }
+    var result = -Infinity, lastComputed = -Infinity;
+    each(obj, function(value, index, list) {
+      var computed = iterator ? iterator.call(context, value, index, list) : value;
+      if (computed > lastComputed) {
+        result = value;
+        lastComputed = computed;
+      }
+    });
     return result;
   };
 
   // Return the minimum element (or element-based computation).
-  _.min = function(obj, iteratee, context) {
-    var result = Infinity, lastComputed = Infinity,
-        value, computed;
-    if (iteratee == null && obj != null) {
-      obj = obj.length === +obj.length ? obj : _.values(obj);
-      for (var i = 0, length = obj.length; i < length; i++) {
-        value = obj[i];
-        if (value < result) {
-          result = value;
-        }
-      }
-    } else {
-      iteratee = _.iteratee(iteratee, context);
-      _.each(obj, function(value, index, list) {
-        computed = iteratee(value, index, list);
-        if (computed < lastComputed || computed === Infinity && result === Infinity) {
-          result = value;
-          lastComputed = computed;
-        }
-      });
+  _.min = function(obj, iterator, context) {
+    if (!iterator && _.isArray(obj) && obj[0] === +obj[0] && obj.length < 65535) {
+      return Math.min.apply(Math, obj);
     }
+    var result = Infinity, lastComputed = Infinity;
+    each(obj, function(value, index, list) {
+      var computed = iterator ? iterator.call(context, value, index, list) : value;
+      if (computed < lastComputed) {
+        result = value;
+        lastComputed = computed;
+      }
+    });
     return result;
   };
 
-  // Shuffle a collection, using the modern version of the
+  // Shuffle an array, using the modern version of the
   // [Fisher-Yates shuffle](http://en.wikipedia.org/wiki/Fisher–Yates_shuffle).
   _.shuffle = function(obj) {
-    var set = obj && obj.length === +obj.length ? obj : _.values(obj);
-    var length = set.length;
-    var shuffled = Array(length);
-    for (var index = 0, rand; index < length; index++) {
-      rand = _.random(0, index);
-      if (rand !== index) shuffled[index] = shuffled[rand];
-      shuffled[rand] = set[index];
-    }
+    var rand;
+    var index = 0;
+    var shuffled = [];
+    each(obj, function(value) {
+      rand = _.random(index++);
+      shuffled[index - 1] = shuffled[rand];
+      shuffled[rand] = value;
+    });
     return shuffled;
   };
 
@@ -1945,14 +1918,21 @@
     return _.shuffle(obj).slice(0, Math.max(0, n));
   };
 
-  // Sort the object's values by a criterion produced by an iteratee.
-  _.sortBy = function(obj, iteratee, context) {
-    iteratee = _.iteratee(iteratee, context);
+  // An internal function to generate lookup iterators.
+  var lookupIterator = function(value) {
+    if (value == null) return _.identity;
+    if (_.isFunction(value)) return value;
+    return _.property(value);
+  };
+
+  // Sort the object's values by a criterion produced by an iterator.
+  _.sortBy = function(obj, iterator, context) {
+    iterator = lookupIterator(iterator);
     return _.pluck(_.map(obj, function(value, index, list) {
       return {
         value: value,
         index: index,
-        criteria: iteratee(value, index, list)
+        criteria: iterator.call(context, value, index, list)
       };
     }).sort(function(left, right) {
       var a = left.criteria;
@@ -1967,12 +1947,12 @@
 
   // An internal function used for aggregate "group by" operations.
   var group = function(behavior) {
-    return function(obj, iteratee, context) {
+    return function(obj, iterator, context) {
       var result = {};
-      iteratee = _.iteratee(iteratee, context);
-      _.each(obj, function(value, index) {
-        var key = iteratee(value, index, obj);
-        behavior(result, value, key);
+      iterator = lookupIterator(iterator);
+      each(obj, function(value, index) {
+        var key = iterator.call(context, value, index, obj);
+        behavior(result, key, value);
       });
       return result;
     };
@@ -1980,32 +1960,32 @@
 
   // Groups the object's values by a criterion. Pass either a string attribute
   // to group by, or a function that returns the criterion.
-  _.groupBy = group(function(result, value, key) {
-    if (_.has(result, key)) result[key].push(value); else result[key] = [value];
+  _.groupBy = group(function(result, key, value) {
+    _.has(result, key) ? result[key].push(value) : result[key] = [value];
   });
 
   // Indexes the object's values by a criterion, similar to `groupBy`, but for
   // when you know that your index values will be unique.
-  _.indexBy = group(function(result, value, key) {
+  _.indexBy = group(function(result, key, value) {
     result[key] = value;
   });
 
   // Counts instances of an object that group by a certain criterion. Pass
   // either a string attribute to count by, or a function that returns the
   // criterion.
-  _.countBy = group(function(result, value, key) {
-    if (_.has(result, key)) result[key]++; else result[key] = 1;
+  _.countBy = group(function(result, key) {
+    _.has(result, key) ? result[key]++ : result[key] = 1;
   });
 
   // Use a comparator function to figure out the smallest index at which
   // an object should be inserted so as to maintain order. Uses binary search.
-  _.sortedIndex = function(array, obj, iteratee, context) {
-    iteratee = _.iteratee(iteratee, context, 1);
-    var value = iteratee(obj);
+  _.sortedIndex = function(array, obj, iterator, context) {
+    iterator = lookupIterator(iterator);
+    var value = iterator.call(context, obj);
     var low = 0, high = array.length;
     while (low < high) {
-      var mid = low + high >>> 1;
-      if (iteratee(array[mid]) < value) low = mid + 1; else high = mid;
+      var mid = (low + high) >>> 1;
+      iterator.call(context, array[mid]) < value ? low = mid + 1 : high = mid;
     }
     return low;
   };
@@ -2021,18 +2001,7 @@
   // Return the number of elements in an object.
   _.size = function(obj) {
     if (obj == null) return 0;
-    return obj.length === +obj.length ? obj.length : _.keys(obj).length;
-  };
-
-  // Split a collection into two arrays: one whose elements all satisfy the given
-  // predicate, and one whose elements all do not satisfy the predicate.
-  _.partition = function(obj, predicate, context) {
-    predicate = _.iteratee(predicate, context);
-    var pass = [], fail = [];
-    _.each(obj, function(value, key, obj) {
-      (predicate(value, key, obj) ? pass : fail).push(value);
-    });
-    return [pass, fail];
+    return (obj.length === +obj.length) ? obj.length : _.keys(obj).length;
   };
 
   // Array Functions
@@ -2043,7 +2012,7 @@
   // allows it to work with `_.map`.
   _.first = _.head = _.take = function(array, n, guard) {
     if (array == null) return void 0;
-    if (n == null || guard) return array[0];
+    if ((n == null) || guard) return array[0];
     if (n < 0) return [];
     return slice.call(array, 0, n);
   };
@@ -2053,14 +2022,14 @@
   // the array, excluding the last N. The **guard** check allows it to work with
   // `_.map`.
   _.initial = function(array, n, guard) {
-    return slice.call(array, 0, Math.max(0, array.length - (n == null || guard ? 1 : n)));
+    return slice.call(array, 0, array.length - ((n == null) || guard ? 1 : n));
   };
 
   // Get the last element of an array. Passing **n** will return the last N
   // values in the array. The **guard** check allows it to work with `_.map`.
   _.last = function(array, n, guard) {
     if (array == null) return void 0;
-    if (n == null || guard) return array[array.length - 1];
+    if ((n == null) || guard) return array[array.length - 1];
     return slice.call(array, Math.max(array.length - n, 0));
   };
 
@@ -2069,7 +2038,7 @@
   // the rest N values in the array. The **guard**
   // check allows it to work with `_.map`.
   _.rest = _.tail = _.drop = function(array, n, guard) {
-    return slice.call(array, n == null || guard ? 1 : n);
+    return slice.call(array, (n == null) || guard ? 1 : n);
   };
 
   // Trim out all falsy values from an array.
@@ -2078,26 +2047,23 @@
   };
 
   // Internal implementation of a recursive `flatten` function.
-  var flatten = function(input, shallow, strict, output) {
+  var flatten = function(input, shallow, output) {
     if (shallow && _.every(input, _.isArray)) {
       return concat.apply(output, input);
     }
-    for (var i = 0, length = input.length; i < length; i++) {
-      var value = input[i];
-      if (!_.isArray(value) && !_.isArguments(value)) {
-        if (!strict) output.push(value);
-      } else if (shallow) {
-        push.apply(output, value);
+    each(input, function(value) {
+      if (_.isArray(value) || _.isArguments(value)) {
+        shallow ? push.apply(output, value) : flatten(value, shallow, output);
       } else {
-        flatten(value, shallow, strict, output);
+        output.push(value);
       }
-    }
+    });
     return output;
   };
 
   // Flatten out an array, either recursively (by default), or just one level.
   _.flatten = function(array, shallow) {
-    return flatten(array, shallow, false, []);
+    return flatten(array, shallow, []);
   };
 
   // Return a version of the array that does not contain the specified value(s).
@@ -2105,77 +2071,68 @@
     return _.difference(array, slice.call(arguments, 1));
   };
 
+  // Split an array into two arrays: one whose elements all satisfy the given
+  // predicate, and one whose elements all do not satisfy the predicate.
+  _.partition = function(array, predicate) {
+    var pass = [], fail = [];
+    each(array, function(elem) {
+      (predicate(elem) ? pass : fail).push(elem);
+    });
+    return [pass, fail];
+  };
+
   // Produce a duplicate-free version of the array. If the array has already
   // been sorted, you have the option of using a faster algorithm.
   // Aliased as `unique`.
-  _.uniq = _.unique = function(array, isSorted, iteratee, context) {
-    if (array == null) return [];
-    if (!_.isBoolean(isSorted)) {
-      context = iteratee;
-      iteratee = isSorted;
+  _.uniq = _.unique = function(array, isSorted, iterator, context) {
+    if (_.isFunction(isSorted)) {
+      context = iterator;
+      iterator = isSorted;
       isSorted = false;
     }
-    if (iteratee != null) iteratee = _.iteratee(iteratee, context);
-    var result = [];
+    var initial = iterator ? _.map(array, iterator, context) : array;
+    var results = [];
     var seen = [];
-    for (var i = 0, length = array.length; i < length; i++) {
-      var value = array[i];
-      if (isSorted) {
-        if (!i || seen !== value) result.push(value);
-        seen = value;
-      } else if (iteratee) {
-        var computed = iteratee(value, i, array);
-        if (_.indexOf(seen, computed) < 0) {
-          seen.push(computed);
-          result.push(value);
-        }
-      } else if (_.indexOf(result, value) < 0) {
-        result.push(value);
+    each(initial, function(value, index) {
+      if (isSorted ? (!index || seen[seen.length - 1] !== value) : !_.contains(seen, value)) {
+        seen.push(value);
+        results.push(array[index]);
       }
-    }
-    return result;
+    });
+    return results;
   };
 
   // Produce an array that contains the union: each distinct element from all of
   // the passed-in arrays.
   _.union = function() {
-    return _.uniq(flatten(arguments, true, true, []));
+    return _.uniq(_.flatten(arguments, true));
   };
 
   // Produce an array that contains every item shared between all the
   // passed-in arrays.
   _.intersection = function(array) {
-    if (array == null) return [];
-    var result = [];
-    var argsLength = arguments.length;
-    for (var i = 0, length = array.length; i < length; i++) {
-      var item = array[i];
-      if (_.contains(result, item)) continue;
-      for (var j = 1; j < argsLength; j++) {
-        if (!_.contains(arguments[j], item)) break;
-      }
-      if (j === argsLength) result.push(item);
-    }
-    return result;
+    var rest = slice.call(arguments, 1);
+    return _.filter(_.uniq(array), function(item) {
+      return _.every(rest, function(other) {
+        return _.contains(other, item);
+      });
+    });
   };
 
   // Take the difference between one array and a number of other arrays.
   // Only the elements present in just the first array will remain.
   _.difference = function(array) {
-    var rest = flatten(slice.call(arguments, 1), true, true, []);
-    return _.filter(array, function(value){
-      return !_.contains(rest, value);
-    });
+    var rest = concat.apply(ArrayProto, slice.call(arguments, 1));
+    return _.filter(array, function(value){ return !_.contains(rest, value); });
   };
 
   // Zip together multiple lists into a single array -- elements that share
   // an index go together.
-  _.zip = function(array) {
-    if (array == null) return [];
-    var length = _.max(arguments, 'length').length;
-    var results = Array(length);
+  _.zip = function() {
+    var length = _.max(_.pluck(arguments, 'length').concat(0));
+    var results = new Array(length);
     for (var i = 0; i < length; i++) {
-      results[i] = _.pluck(arguments, i);
+      results[i] = _.pluck(arguments, '' + i);
     }
     return results;
   };
@@ -2196,8 +2153,10 @@
     return result;
   };
 
-  // Return the position of the first occurrence of an item in an array,
-  // or -1 if the item is not included in the array.
+  // If the browser doesn't supply us with indexOf (I'm looking at you, **MSIE**),
+  // we need this function. Return the position of the first occurrence of an
+  // item in an array, or -1 if the item is not included in the array.
+  // Delegates to **ECMAScript 5**'s native `indexOf` if available.
   // If the array is large and already in sort order, pass `true`
   // for **isSorted** to use binary search.
   _.indexOf = function(array, item, isSorted) {
@@ -2205,23 +2164,26 @@
     var i = 0, length = array.length;
     if (isSorted) {
       if (typeof isSorted == 'number') {
-        i = isSorted < 0 ? Math.max(0, length + isSorted) : isSorted;
+        i = (isSorted < 0 ? Math.max(0, length + isSorted) : isSorted);
       } else {
         i = _.sortedIndex(array, item);
         return array[i] === item ? i : -1;
       }
     }
+    if (nativeIndexOf && array.indexOf === nativeIndexOf) return array.indexOf(item, isSorted);
     for (; i < length; i++) if (array[i] === item) return i;
     return -1;
   };
 
+  // Delegates to **ECMAScript 5**'s native `lastIndexOf` if available.
   _.lastIndexOf = function(array, item, from) {
     if (array == null) return -1;
-    var idx = array.length;
-    if (typeof from == 'number') {
-      idx = from < 0 ? idx + from + 1 : Math.min(idx, from + 1);
+    var hasIndex = from != null;
+    if (nativeLastIndexOf && array.lastIndexOf === nativeLastIndexOf) {
+      return hasIndex ? array.lastIndexOf(item, from) : array.lastIndexOf(item);
     }
-    while (--idx >= 0) if (array[idx] === item) return idx;
+    var i = (hasIndex ? from : array.length);
+    while (i--) if (array[i] === item) return i;
     return -1;
   };
 
@@ -2233,13 +2195,15 @@
       stop = start || 0;
       start = 0;
     }
-    step = step || 1;
+    step = arguments[2] || 1;
 
     var length = Math.max(Math.ceil((stop - start) / step), 0);
-    var range = Array(length);
+    var idx = 0;
+    var range = new Array(length);
 
-    for (var idx = 0; idx < length; idx++, start += step) {
-      range[idx] = start;
+    while(idx < length) {
+      range[idx++] = start;
+      start += step;
     }
 
     return range;
@@ -2249,7 +2213,7 @@
   // ------------------
 
   // Reusable constructor function for prototype setting.
-  var Ctor = function(){};
+  var ctor = function(){};
 
   // Create a function bound to a given object (assigning `this`, and arguments,
   // optionally). Delegates to **ECMAScript 5**'s native `Function.bind` if
@@ -2257,18 +2221,17 @@
   _.bind = function(func, context) {
     var args, bound;
     if (nativeBind && func.bind === nativeBind) return nativeBind.apply(func, slice.call(arguments, 1));
-    if (!_.isFunction(func)) throw new TypeError('Bind must be called on a function');
+    if (!_.isFunction(func)) throw new TypeError;
     args = slice.call(arguments, 2);
-    bound = function() {
+    return bound = function() {
       if (!(this instanceof bound)) return func.apply(context, args.concat(slice.call(arguments)));
-      Ctor.prototype = func.prototype;
-      var self = new Ctor;
-      Ctor.prototype = null;
+      ctor.prototype = func.prototype;
+      var self = new ctor;
+      ctor.prototype = null;
       var result = func.apply(self, args.concat(slice.call(arguments)));
-      if (_.isObject(result)) return result;
+      if (Object(result) === result) return result;
       return self;
     };
-    return bound;
   };
 
   // Partially apply a function by creating a version that has had some of its
@@ -2291,34 +2254,27 @@
   // are the method names to be bound. Useful for ensuring that all callbacks
   // defined on an object belong to it.
   _.bindAll = function(obj) {
-    var i, length = arguments.length, key;
-    if (length <= 1) throw new Error('bindAll must be passed function names');
-    for (i = 1; i < length; i++) {
-      key = arguments[i];
-      obj[key] = _.bind(obj[key], obj);
-    }
+    var funcs = slice.call(arguments, 1);
+    if (funcs.length === 0) throw new Error('bindAll must be passed function names');
+    each(funcs, function(f) { obj[f] = _.bind(obj[f], obj); });
     return obj;
   };
 
   // Memoize an expensive function by storing its results.
   _.memoize = function(func, hasher) {
-    var memoize = function(key) {
-      var cache = memoize.cache;
-      var address = hasher ? hasher.apply(this, arguments) : key;
-      if (!_.has(cache, address)) cache[address] = func.apply(this, arguments);
-      return cache[address];
+    var memo = {};
+    hasher || (hasher = _.identity);
+    return function() {
+      var key = hasher.apply(this, arguments);
+      return _.has(memo, key) ? memo[key] : (memo[key] = func.apply(this, arguments));
     };
-    memoize.cache = {};
-    return memoize;
   };
 
   // Delays a function for the given number of milliseconds, and then calls
   // it with the arguments supplied.
   _.delay = function(func, wait) {
     var args = slice.call(arguments, 2);
-    return setTimeout(function(){
-      return func.apply(null, args);
-    }, wait);
+    return setTimeout(function(){ return func.apply(null, args); }, wait);
   };
 
   // Defers a function, scheduling it to run after the current call stack has
@@ -2336,12 +2292,12 @@
     var context, args, result;
     var timeout = null;
     var previous = 0;
-    if (!options) options = {};
+    options || (options = {});
     var later = function() {
       previous = options.leading === false ? 0 : _.now();
       timeout = null;
       result = func.apply(context, args);
-      if (!timeout) context = args = null;
+      context = args = null;
     };
     return function() {
       var now = _.now();
@@ -2349,12 +2305,12 @@
       var remaining = wait - (now - previous);
       context = this;
       args = arguments;
-      if (remaining <= 0 || remaining > wait) {
+      if (remaining <= 0) {
         clearTimeout(timeout);
         timeout = null;
         previous = now;
         result = func.apply(context, args);
-        if (!timeout) context = args = null;
+        context = args = null;
       } else if (!timeout && options.trailing !== false) {
         timeout = setTimeout(later, remaining);
       }
@@ -2371,14 +2327,13 @@
 
     var later = function() {
       var last = _.now() - timestamp;
-
-      if (last < wait && last > 0) {
+      if (last < wait) {
         timeout = setTimeout(later, wait - last);
       } else {
         timeout = null;
         if (!immediate) {
           result = func.apply(context, args);
-          if (!timeout) context = args = null;
+          context = args = null;
         }
       }
     };
@@ -2388,13 +2343,28 @@
       args = arguments;
       timestamp = _.now();
       var callNow = immediate && !timeout;
-      if (!timeout) timeout = setTimeout(later, wait);
+      if (!timeout) {
+        timeout = setTimeout(later, wait);
+      }
       if (callNow) {
         result = func.apply(context, args);
         context = args = null;
       }
 
       return result;
+    };
+  };
+
+  // Returns a function that will be executed at most one time, no matter how
+  // often you call it. Useful for lazy initialization.
+  _.once = function(func) {
+    var ran = false, memo;
+    return function() {
+      if (ran) return memo;
+      ran = true;
+      memo = func.apply(this, arguments);
+      func = null;
+      return memo;
     };
   };
 
@@ -2405,23 +2375,16 @@
     return _.partial(wrapper, func);
   };
 
-  // Returns a negated version of the passed-in predicate.
-  _.negate = function(predicate) {
-    return function() {
-      return !predicate.apply(this, arguments);
-    };
-  };
-
   // Returns a function that is the composition of a list of functions, each
   // consuming the return value of the function that follows.
   _.compose = function() {
-    var args = arguments;
-    var start = args.length - 1;
+    var funcs = arguments;
     return function() {
-      var i = start;
-      var result = args[start].apply(this, arguments);
-      while (i--) result = args[i].call(this, result);
-      return result;
+      var args = arguments;
+      for (var i = funcs.length - 1; i >= 0; i--) {
+        args = [funcs[i].apply(this, args)];
+      }
+      return args[0];
     };
   };
 
@@ -2433,23 +2396,6 @@
       }
     };
   };
-
-  // Returns a function that will only be executed before being called N times.
-  _.before = function(times, func) {
-    var memo;
-    return function() {
-      if (--times > 0) {
-        memo = func.apply(this, arguments);
-      } else {
-        func = null;
-      }
-      return memo;
-    };
-  };
-
-  // Returns a function that will be executed at most one time, no matter how
-  // often you call it. Useful for lazy initialization.
-  _.once = _.partial(_.before, 2);
 
   // Object Functions
   // ----------------
@@ -2468,7 +2414,7 @@
   _.values = function(obj) {
     var keys = _.keys(obj);
     var length = keys.length;
-    var values = Array(length);
+    var values = new Array(length);
     for (var i = 0; i < length; i++) {
       values[i] = obj[keys[i]];
     }
@@ -2479,7 +2425,7 @@
   _.pairs = function(obj) {
     var keys = _.keys(obj);
     var length = keys.length;
-    var pairs = Array(length);
+    var pairs = new Array(length);
     for (var i = 0; i < length; i++) {
       pairs[i] = [keys[i], obj[keys[i]]];
     }
@@ -2508,62 +2454,45 @@
 
   // Extend a given object with all the properties in passed-in object(s).
   _.extend = function(obj) {
-    if (!_.isObject(obj)) return obj;
-    var source, prop;
-    for (var i = 1, length = arguments.length; i < length; i++) {
-      source = arguments[i];
-      for (prop in source) {
-        if (hasOwnProperty.call(source, prop)) {
-            obj[prop] = source[prop];
+    each(slice.call(arguments, 1), function(source) {
+      if (source) {
+        for (var prop in source) {
+          obj[prop] = source[prop];
         }
       }
-    }
+    });
     return obj;
   };
 
   // Return a copy of the object only containing the whitelisted properties.
-  _.pick = function(obj, iteratee, context) {
-    var result = {}, key;
-    if (obj == null) return result;
-    if (_.isFunction(iteratee)) {
-      iteratee = createCallback(iteratee, context);
-      for (key in obj) {
-        var value = obj[key];
-        if (iteratee(value, key, obj)) result[key] = value;
-      }
-    } else {
-      var keys = concat.apply([], slice.call(arguments, 1));
-      obj = new Object(obj);
-      for (var i = 0, length = keys.length; i < length; i++) {
-        key = keys[i];
-        if (key in obj) result[key] = obj[key];
-      }
-    }
-    return result;
+  _.pick = function(obj) {
+    var copy = {};
+    var keys = concat.apply(ArrayProto, slice.call(arguments, 1));
+    each(keys, function(key) {
+      if (key in obj) copy[key] = obj[key];
+    });
+    return copy;
   };
 
    // Return a copy of the object without the blacklisted properties.
-  _.omit = function(obj, iteratee, context) {
-    if (_.isFunction(iteratee)) {
-      iteratee = _.negate(iteratee);
-    } else {
-      var keys = _.map(concat.apply([], slice.call(arguments, 1)), String);
-      iteratee = function(value, key) {
-        return !_.contains(keys, key);
-      };
+  _.omit = function(obj) {
+    var copy = {};
+    var keys = concat.apply(ArrayProto, slice.call(arguments, 1));
+    for (var key in obj) {
+      if (!_.contains(keys, key)) copy[key] = obj[key];
     }
-    return _.pick(obj, iteratee, context);
+    return copy;
   };
 
   // Fill in a given object with default properties.
   _.defaults = function(obj) {
-    if (!_.isObject(obj)) return obj;
-    for (var i = 1, length = arguments.length; i < length; i++) {
-      var source = arguments[i];
-      for (var prop in source) {
-        if (obj[prop] === void 0) obj[prop] = source[prop];
+    each(slice.call(arguments, 1), function(source) {
+      if (source) {
+        for (var prop in source) {
+          if (obj[prop] === void 0) obj[prop] = source[prop];
+        }
       }
-    }
+    });
     return obj;
   };
 
@@ -2585,7 +2514,7 @@
   var eq = function(a, b, aStack, bStack) {
     // Identical objects are equal. `0 === -0`, but they aren't identical.
     // See the [Harmony `egal` proposal](http://wiki.ecmascript.org/doku.php?id=harmony:egal).
-    if (a === b) return a !== 0 || 1 / a === 1 / b;
+    if (a === b) return a !== 0 || 1 / a == 1 / b;
     // A strict comparison is necessary because `null == undefined`.
     if (a == null || b == null) return a === b;
     // Unwrap any wrapped objects.
@@ -2593,27 +2522,29 @@
     if (b instanceof _) b = b._wrapped;
     // Compare `[[Class]]` names.
     var className = toString.call(a);
-    if (className !== toString.call(b)) return false;
+    if (className != toString.call(b)) return false;
     switch (className) {
-      // Strings, numbers, regular expressions, dates, and booleans are compared by value.
-      case '[object RegExp]':
-      // RegExps are coerced to strings for comparison (Note: '' + /a/i === '/a/i')
+      // Strings, numbers, dates, and booleans are compared by value.
       case '[object String]':
         // Primitives and their corresponding object wrappers are equivalent; thus, `"5"` is
         // equivalent to `new String("5")`.
-        return '' + a === '' + b;
+        return a == String(b);
       case '[object Number]':
-        // `NaN`s are equivalent, but non-reflexive.
-        // Object(NaN) is equivalent to NaN
-        if (+a !== +a) return +b !== +b;
-        // An `egal` comparison is performed for other numeric values.
-        return +a === 0 ? 1 / +a === 1 / b : +a === +b;
+        // `NaN`s are equivalent, but non-reflexive. An `egal` comparison is performed for
+        // other numeric values.
+        return a != +a ? b != +b : (a == 0 ? 1 / a == 1 / b : a == +b);
       case '[object Date]':
       case '[object Boolean]':
         // Coerce dates and booleans to numeric primitive values. Dates are compared by their
         // millisecond representations. Note that invalid dates with millisecond representations
         // of `NaN` are not equivalent.
-        return +a === +b;
+        return +a == +b;
+      // RegExps are compared by their source patterns and flags.
+      case '[object RegExp]':
+        return a.source == b.source &&
+               a.global == b.global &&
+               a.multiline == b.multiline &&
+               a.ignoreCase == b.ignoreCase;
     }
     if (typeof a != 'object' || typeof b != 'object') return false;
     // Assume equality for cyclic structures. The algorithm for detecting cyclic
@@ -2622,29 +2553,25 @@
     while (length--) {
       // Linear search. Performance is inversely proportional to the number of
       // unique nested structures.
-      if (aStack[length] === a) return bStack[length] === b;
+      if (aStack[length] == a) return bStack[length] == b;
     }
     // Objects with different constructors are not equivalent, but `Object`s
     // from different frames are.
     var aCtor = a.constructor, bCtor = b.constructor;
-    if (
-      aCtor !== bCtor &&
-      // Handle Object.create(x) cases
-      'constructor' in a && 'constructor' in b &&
-      !(_.isFunction(aCtor) && aCtor instanceof aCtor &&
-        _.isFunction(bCtor) && bCtor instanceof bCtor)
-    ) {
+    if (aCtor !== bCtor && !(_.isFunction(aCtor) && (aCtor instanceof aCtor) &&
+                             _.isFunction(bCtor) && (bCtor instanceof bCtor))
+                        && ('constructor' in a && 'constructor' in b)) {
       return false;
     }
     // Add the first object to the stack of traversed objects.
     aStack.push(a);
     bStack.push(b);
-    var size, result;
+    var size = 0, result = true;
     // Recursively compare objects and arrays.
-    if (className === '[object Array]') {
+    if (className == '[object Array]') {
       // Compare array lengths to determine if a deep comparison is necessary.
       size = a.length;
-      result = size === b.length;
+      result = size == b.length;
       if (result) {
         // Deep compare the contents, ignoring non-numeric properties.
         while (size--) {
@@ -2653,16 +2580,20 @@
       }
     } else {
       // Deep compare objects.
-      var keys = _.keys(a), key;
-      size = keys.length;
-      // Ensure that both objects contain the same number of properties before comparing deep equality.
-      result = _.keys(b).length === size;
-      if (result) {
-        while (size--) {
-          // Deep compare each member
-          key = keys[size];
+      for (var key in a) {
+        if (_.has(a, key)) {
+          // Count the expected number of properties.
+          size++;
+          // Deep compare each member.
           if (!(result = _.has(b, key) && eq(a[key], b[key], aStack, bStack))) break;
         }
+      }
+      // Ensure that both objects contain the same number of properties.
+      if (result) {
+        for (key in b) {
+          if (_.has(b, key) && !(size--)) break;
+        }
+        result = !size;
       }
     }
     // Remove the first object from the stack of traversed objects.
@@ -2680,7 +2611,7 @@
   // An "empty" object has no enumerable own-properties.
   _.isEmpty = function(obj) {
     if (obj == null) return true;
-    if (_.isArray(obj) || _.isString(obj) || _.isArguments(obj)) return obj.length === 0;
+    if (_.isArray(obj) || _.isString(obj)) return obj.length === 0;
     for (var key in obj) if (_.has(obj, key)) return false;
     return true;
   };
@@ -2693,19 +2624,18 @@
   // Is a given value an array?
   // Delegates to ECMA5's native Array.isArray
   _.isArray = nativeIsArray || function(obj) {
-    return toString.call(obj) === '[object Array]';
+    return toString.call(obj) == '[object Array]';
   };
 
   // Is a given variable an object?
   _.isObject = function(obj) {
-    var type = typeof obj;
-    return type === 'function' || type === 'object' && !!obj;
+    return obj === Object(obj);
   };
 
   // Add some isType methods: isArguments, isFunction, isString, isNumber, isDate, isRegExp.
-  _.each(['Arguments', 'Function', 'String', 'Number', 'Date', 'RegExp'], function(name) {
+  each(['Arguments', 'Function', 'String', 'Number', 'Date', 'RegExp'], function(name) {
     _['is' + name] = function(obj) {
-      return toString.call(obj) === '[object ' + name + ']';
+      return toString.call(obj) == '[object ' + name + ']';
     };
   });
 
@@ -2713,14 +2643,14 @@
   // there isn't any inspectable "Arguments" type.
   if (!_.isArguments(arguments)) {
     _.isArguments = function(obj) {
-      return _.has(obj, 'callee');
+      return !!(obj && _.has(obj, 'callee'));
     };
   }
 
-  // Optimize `isFunction` if appropriate. Work around an IE 11 bug.
-  if (typeof /./ !== 'function') {
+  // Optimize `isFunction` if appropriate.
+  if (typeof (/./) !== 'function') {
     _.isFunction = function(obj) {
-      return typeof obj == 'function' || false;
+      return typeof obj === 'function';
     };
   }
 
@@ -2731,12 +2661,12 @@
 
   // Is the given value `NaN`? (NaN is the only number which does not equal itself).
   _.isNaN = function(obj) {
-    return _.isNumber(obj) && obj !== +obj;
+    return _.isNumber(obj) && obj != +obj;
   };
 
   // Is a given value a boolean?
   _.isBoolean = function(obj) {
-    return obj === true || obj === false || toString.call(obj) === '[object Boolean]';
+    return obj === true || obj === false || toString.call(obj) == '[object Boolean]';
   };
 
   // Is a given value equal to null?
@@ -2752,7 +2682,7 @@
   // Shortcut function for checking if an object has a given property directly
   // on itself (in other words, not on a prototype).
   _.has = function(obj, key) {
-    return obj != null && hasOwnProperty.call(obj, key);
+    return hasOwnProperty.call(obj, key);
   };
 
   // Utility Functions
@@ -2765,18 +2695,16 @@
     return this;
   };
 
-  // Keep the identity function around for default iteratees.
+  // Keep the identity function around for default iterators.
   _.identity = function(value) {
     return value;
   };
 
   _.constant = function(value) {
-    return function() {
+    return function () {
       return value;
     };
   };
-
-  _.noop = function(){};
 
   _.property = function(key) {
     return function(obj) {
@@ -2786,23 +2714,20 @@
 
   // Returns a predicate for checking whether an object has a given set of `key:value` pairs.
   _.matches = function(attrs) {
-    var pairs = _.pairs(attrs), length = pairs.length;
     return function(obj) {
-      if (obj == null) return !length;
-      obj = new Object(obj);
-      for (var i = 0; i < length; i++) {
-        var pair = pairs[i], key = pair[0];
-        if (pair[1] !== obj[key] || !(key in obj)) return false;
+      if (obj === attrs) return true; //avoid comparing an object to itself.
+      for (var key in attrs) {
+        if (attrs[key] !== obj[key])
+          return false;
       }
       return true;
-    };
+    }
   };
 
   // Run a function **n** times.
-  _.times = function(n, iteratee, context) {
+  _.times = function(n, iterator, context) {
     var accum = Array(Math.max(0, n));
-    iteratee = createCallback(iteratee, context, 1);
-    for (var i = 0; i < n; i++) accum[i] = iteratee(i);
+    for (var i = 0; i < n; i++) accum[i] = iterator.call(context, i);
     return accum;
   };
 
@@ -2816,44 +2741,54 @@
   };
 
   // A (possibly faster) way to get the current timestamp as an integer.
-  _.now = Date.now || function() {
-    return new Date().getTime();
-  };
+  _.now = Date.now || function() { return new Date().getTime(); };
 
-   // List of HTML entities for escaping.
-  var escapeMap = {
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#x27;',
-    '`': '&#x60;'
+  // List of HTML entities for escaping.
+  var entityMap = {
+    escape: {
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#x27;'
+    }
   };
-  var unescapeMap = _.invert(escapeMap);
+  entityMap.unescape = _.invert(entityMap.escape);
+
+  // Regexes containing the keys and values listed immediately above.
+  var entityRegexes = {
+    escape:   new RegExp('[' + _.keys(entityMap.escape).join('') + ']', 'g'),
+    unescape: new RegExp('(' + _.keys(entityMap.unescape).join('|') + ')', 'g')
+  };
 
   // Functions for escaping and unescaping strings to/from HTML interpolation.
-  var createEscaper = function(map) {
-    var escaper = function(match) {
-      return map[match];
+  _.each(['escape', 'unescape'], function(method) {
+    _[method] = function(string) {
+      if (string == null) return '';
+      return ('' + string).replace(entityRegexes[method], function(match) {
+        return entityMap[method][match];
+      });
     };
-    // Regexes for identifying a key that needs to be escaped
-    var source = '(?:' + _.keys(map).join('|') + ')';
-    var testRegexp = RegExp(source);
-    var replaceRegexp = RegExp(source, 'g');
-    return function(string) {
-      string = string == null ? '' : '' + string;
-      return testRegexp.test(string) ? string.replace(replaceRegexp, escaper) : string;
-    };
-  };
-  _.escape = createEscaper(escapeMap);
-  _.unescape = createEscaper(unescapeMap);
+  });
 
   // If the value of the named `property` is a function then invoke it with the
   // `object` as context; otherwise, return it.
   _.result = function(object, property) {
     if (object == null) return void 0;
     var value = object[property];
-    return _.isFunction(value) ? object[property]() : value;
+    return _.isFunction(value) ? value.call(object) : value;
+  };
+
+  // Add your own custom functions to the Underscore object.
+  _.mixin = function(obj) {
+    each(_.functions(obj), function(name) {
+      var func = _[name] = obj[name];
+      _.prototype[name] = function() {
+        var args = [this._wrapped];
+        push.apply(args, arguments);
+        return result.call(this, func.apply(_, args));
+      };
+    });
   };
 
   // Generate a unique integer id (unique within the entire client session).
@@ -2884,26 +2819,22 @@
     '\\':     '\\',
     '\r':     'r',
     '\n':     'n',
+    '\t':     't',
     '\u2028': 'u2028',
     '\u2029': 'u2029'
   };
 
-  var escaper = /\\|'|\r|\n|\u2028|\u2029/g;
-
-  var escapeChar = function(match) {
-    return '\\' + escapes[match];
-  };
+  var escaper = /\\|'|\r|\n|\t|\u2028|\u2029/g;
 
   // JavaScript micro-templating, similar to John Resig's implementation.
   // Underscore templating handles arbitrary delimiters, preserves whitespace,
   // and correctly escapes quotes within interpolated code.
-  // NB: `oldSettings` only exists for backwards compatibility.
-  _.template = function(text, settings, oldSettings) {
-    if (!settings && oldSettings) settings = oldSettings;
+  _.template = function(text, data, settings) {
+    var render;
     settings = _.defaults({}, settings, _.templateSettings);
 
     // Combine delimiters into one regular expression via alternation.
-    var matcher = RegExp([
+    var matcher = new RegExp([
       (settings.escape || noMatch).source,
       (settings.interpolate || noMatch).source,
       (settings.evaluate || noMatch).source
@@ -2913,18 +2844,19 @@
     var index = 0;
     var source = "__p+='";
     text.replace(matcher, function(match, escape, interpolate, evaluate, offset) {
-      source += text.slice(index, offset).replace(escaper, escapeChar);
-      index = offset + match.length;
+      source += text.slice(index, offset)
+        .replace(escaper, function(match) { return '\\' + escapes[match]; });
 
       if (escape) {
         source += "'+\n((__t=(" + escape + "))==null?'':_.escape(__t))+\n'";
-      } else if (interpolate) {
+      }
+      if (interpolate) {
         source += "'+\n((__t=(" + interpolate + "))==null?'':__t)+\n'";
-      } else if (evaluate) {
+      }
+      if (evaluate) {
         source += "';\n" + evaluate + "\n__p+='";
       }
-
-      // Adobe VMs need the match returned to produce the correct offest.
+      index = offset + match.length;
       return match;
     });
     source += "';\n";
@@ -2934,31 +2866,29 @@
 
     source = "var __t,__p='',__j=Array.prototype.join," +
       "print=function(){__p+=__j.call(arguments,'');};\n" +
-      source + 'return __p;\n';
+      source + "return __p;\n";
 
     try {
-      var render = new Function(settings.variable || 'obj', '_', source);
+      render = new Function(settings.variable || 'obj', '_', source);
     } catch (e) {
       e.source = source;
       throw e;
     }
 
+    if (data) return render(data, _);
     var template = function(data) {
       return render.call(this, data, _);
     };
 
-    // Provide the compiled source as a convenience for precompilation.
-    var argument = settings.variable || 'obj';
-    template.source = 'function(' + argument + '){\n' + source + '}';
+    // Provide the compiled function source as a convenience for precompilation.
+    template.source = 'function(' + (settings.variable || 'obj') + '){\n' + source + '}';
 
     return template;
   };
 
-  // Add a "chain" function. Start chaining a wrapped Underscore object.
+  // Add a "chain" function, which will delegate to the wrapper.
   _.chain = function(obj) {
-    var instance = _(obj);
-    instance._chain = true;
-    return instance;
+    return _(obj).chain();
   };
 
   // OOP
@@ -2972,44 +2902,42 @@
     return this._chain ? _(obj).chain() : obj;
   };
 
-  // Add your own custom functions to the Underscore object.
-  _.mixin = function(obj) {
-    _.each(_.functions(obj), function(name) {
-      var func = _[name] = obj[name];
-      _.prototype[name] = function() {
-        var args = [this._wrapped];
-        push.apply(args, arguments);
-        return result.call(this, func.apply(_, args));
-      };
-    });
-  };
-
   // Add all of the Underscore functions to the wrapper object.
   _.mixin(_);
 
   // Add all mutator Array functions to the wrapper.
-  _.each(['pop', 'push', 'reverse', 'shift', 'sort', 'splice', 'unshift'], function(name) {
+  each(['pop', 'push', 'reverse', 'shift', 'sort', 'splice', 'unshift'], function(name) {
     var method = ArrayProto[name];
     _.prototype[name] = function() {
       var obj = this._wrapped;
       method.apply(obj, arguments);
-      if ((name === 'shift' || name === 'splice') && obj.length === 0) delete obj[0];
+      if ((name == 'shift' || name == 'splice') && obj.length === 0) delete obj[0];
       return result.call(this, obj);
     };
   });
 
   // Add all accessor Array functions to the wrapper.
-  _.each(['concat', 'join', 'slice'], function(name) {
+  each(['concat', 'join', 'slice'], function(name) {
     var method = ArrayProto[name];
     _.prototype[name] = function() {
       return result.call(this, method.apply(this._wrapped, arguments));
     };
   });
 
-  // Extracts the result from a wrapped and chained object.
-  _.prototype.value = function() {
-    return this._wrapped;
-  };
+  _.extend(_.prototype, {
+
+    // Start chaining a wrapped Underscore object.
+    chain: function() {
+      this._chain = true;
+      return this;
+    },
+
+    // Extracts the result from a wrapped and chained object.
+    value: function() {
+      return this._wrapped;
+    }
+
+  });
 
   // AMD registration happens at the end for compatibility with AMD loaders
   // that may not enforce next-turn semantics on modules. Even though general
@@ -3023,9 +2951,1328 @@
       return _;
     });
   }
-}.call(this));
+}).call(this);
 
 },{}],3:[function(require,module,exports){
+/*!
+ * The buffer module from node.js, for the browser.
+ *
+ * @author   Feross Aboukhadijeh <feross@feross.org> <http://feross.org>
+ * @license  MIT
+ */
+
+var base64 = require('base64-js')
+var ieee754 = require('ieee754')
+
+exports.Buffer = Buffer
+exports.SlowBuffer = Buffer
+exports.INSPECT_MAX_BYTES = 50
+Buffer.poolSize = 8192
+
+/**
+ * If `Buffer._useTypedArrays`:
+ *   === true    Use Uint8Array implementation (fastest)
+ *   === false   Use Object implementation (compatible down to IE6)
+ */
+Buffer._useTypedArrays = (function () {
+  // Detect if browser supports Typed Arrays. Supported browsers are IE 10+, Firefox 4+,
+  // Chrome 7+, Safari 5.1+, Opera 11.6+, iOS 4.2+. If the browser does not support adding
+  // properties to `Uint8Array` instances, then that's the same as no `Uint8Array` support
+  // because we need to be able to add all the node Buffer API methods. This is an issue
+  // in Firefox 4-29. Now fixed: https://bugzilla.mozilla.org/show_bug.cgi?id=695438
+  try {
+    var buf = new ArrayBuffer(0)
+    var arr = new Uint8Array(buf)
+    arr.foo = function () { return 42 }
+    return 42 === arr.foo() &&
+        typeof arr.subarray === 'function' // Chrome 9-10 lack `subarray`
+  } catch (e) {
+    return false
+  }
+})()
+
+/**
+ * Class: Buffer
+ * =============
+ *
+ * The Buffer constructor returns instances of `Uint8Array` that are augmented
+ * with function properties for all the node `Buffer` API functions. We use
+ * `Uint8Array` so that square bracket notation works as expected -- it returns
+ * a single octet.
+ *
+ * By augmenting the instances, we can avoid modifying the `Uint8Array`
+ * prototype.
+ */
+function Buffer (subject, encoding, noZero) {
+  if (!(this instanceof Buffer))
+    return new Buffer(subject, encoding, noZero)
+
+  var type = typeof subject
+
+  // Workaround: node's base64 implementation allows for non-padded strings
+  // while base64-js does not.
+  if (encoding === 'base64' && type === 'string') {
+    subject = stringtrim(subject)
+    while (subject.length % 4 !== 0) {
+      subject = subject + '='
+    }
+  }
+
+  // Find the length
+  var length
+  if (type === 'number')
+    length = coerce(subject)
+  else if (type === 'string')
+    length = Buffer.byteLength(subject, encoding)
+  else if (type === 'object')
+    length = coerce(subject.length) // assume that object is array-like
+  else
+    throw new Error('First argument needs to be a number, array or string.')
+
+  var buf
+  if (Buffer._useTypedArrays) {
+    // Preferred: Return an augmented `Uint8Array` instance for best performance
+    buf = Buffer._augment(new Uint8Array(length))
+  } else {
+    // Fallback: Return THIS instance of Buffer (created by `new`)
+    buf = this
+    buf.length = length
+    buf._isBuffer = true
+  }
+
+  var i
+  if (Buffer._useTypedArrays && typeof subject.byteLength === 'number') {
+    // Speed optimization -- use set if we're copying from a typed array
+    buf._set(subject)
+  } else if (isArrayish(subject)) {
+    // Treat array-ish objects as a byte array
+    for (i = 0; i < length; i++) {
+      if (Buffer.isBuffer(subject))
+        buf[i] = subject.readUInt8(i)
+      else
+        buf[i] = subject[i]
+    }
+  } else if (type === 'string') {
+    buf.write(subject, 0, encoding)
+  } else if (type === 'number' && !Buffer._useTypedArrays && !noZero) {
+    for (i = 0; i < length; i++) {
+      buf[i] = 0
+    }
+  }
+
+  return buf
+}
+
+// STATIC METHODS
+// ==============
+
+Buffer.isEncoding = function (encoding) {
+  switch (String(encoding).toLowerCase()) {
+    case 'hex':
+    case 'utf8':
+    case 'utf-8':
+    case 'ascii':
+    case 'binary':
+    case 'base64':
+    case 'raw':
+    case 'ucs2':
+    case 'ucs-2':
+    case 'utf16le':
+    case 'utf-16le':
+      return true
+    default:
+      return false
+  }
+}
+
+Buffer.isBuffer = function (b) {
+  return !!(b !== null && b !== undefined && b._isBuffer)
+}
+
+Buffer.byteLength = function (str, encoding) {
+  var ret
+  str = str + ''
+  switch (encoding || 'utf8') {
+    case 'hex':
+      ret = str.length / 2
+      break
+    case 'utf8':
+    case 'utf-8':
+      ret = utf8ToBytes(str).length
+      break
+    case 'ascii':
+    case 'binary':
+    case 'raw':
+      ret = str.length
+      break
+    case 'base64':
+      ret = base64ToBytes(str).length
+      break
+    case 'ucs2':
+    case 'ucs-2':
+    case 'utf16le':
+    case 'utf-16le':
+      ret = str.length * 2
+      break
+    default:
+      throw new Error('Unknown encoding')
+  }
+  return ret
+}
+
+Buffer.concat = function (list, totalLength) {
+  assert(isArray(list), 'Usage: Buffer.concat(list, [totalLength])\n' +
+      'list should be an Array.')
+
+  if (list.length === 0) {
+    return new Buffer(0)
+  } else if (list.length === 1) {
+    return list[0]
+  }
+
+  var i
+  if (typeof totalLength !== 'number') {
+    totalLength = 0
+    for (i = 0; i < list.length; i++) {
+      totalLength += list[i].length
+    }
+  }
+
+  var buf = new Buffer(totalLength)
+  var pos = 0
+  for (i = 0; i < list.length; i++) {
+    var item = list[i]
+    item.copy(buf, pos)
+    pos += item.length
+  }
+  return buf
+}
+
+// BUFFER INSTANCE METHODS
+// =======================
+
+function _hexWrite (buf, string, offset, length) {
+  offset = Number(offset) || 0
+  var remaining = buf.length - offset
+  if (!length) {
+    length = remaining
+  } else {
+    length = Number(length)
+    if (length > remaining) {
+      length = remaining
+    }
+  }
+
+  // must be an even number of digits
+  var strLen = string.length
+  assert(strLen % 2 === 0, 'Invalid hex string')
+
+  if (length > strLen / 2) {
+    length = strLen / 2
+  }
+  for (var i = 0; i < length; i++) {
+    var byte = parseInt(string.substr(i * 2, 2), 16)
+    assert(!isNaN(byte), 'Invalid hex string')
+    buf[offset + i] = byte
+  }
+  Buffer._charsWritten = i * 2
+  return i
+}
+
+function _utf8Write (buf, string, offset, length) {
+  var charsWritten = Buffer._charsWritten =
+    blitBuffer(utf8ToBytes(string), buf, offset, length)
+  return charsWritten
+}
+
+function _asciiWrite (buf, string, offset, length) {
+  var charsWritten = Buffer._charsWritten =
+    blitBuffer(asciiToBytes(string), buf, offset, length)
+  return charsWritten
+}
+
+function _binaryWrite (buf, string, offset, length) {
+  return _asciiWrite(buf, string, offset, length)
+}
+
+function _base64Write (buf, string, offset, length) {
+  var charsWritten = Buffer._charsWritten =
+    blitBuffer(base64ToBytes(string), buf, offset, length)
+  return charsWritten
+}
+
+function _utf16leWrite (buf, string, offset, length) {
+  var charsWritten = Buffer._charsWritten =
+    blitBuffer(utf16leToBytes(string), buf, offset, length)
+  return charsWritten
+}
+
+Buffer.prototype.write = function (string, offset, length, encoding) {
+  // Support both (string, offset, length, encoding)
+  // and the legacy (string, encoding, offset, length)
+  if (isFinite(offset)) {
+    if (!isFinite(length)) {
+      encoding = length
+      length = undefined
+    }
+  } else {  // legacy
+    var swap = encoding
+    encoding = offset
+    offset = length
+    length = swap
+  }
+
+  offset = Number(offset) || 0
+  var remaining = this.length - offset
+  if (!length) {
+    length = remaining
+  } else {
+    length = Number(length)
+    if (length > remaining) {
+      length = remaining
+    }
+  }
+  encoding = String(encoding || 'utf8').toLowerCase()
+
+  var ret
+  switch (encoding) {
+    case 'hex':
+      ret = _hexWrite(this, string, offset, length)
+      break
+    case 'utf8':
+    case 'utf-8':
+      ret = _utf8Write(this, string, offset, length)
+      break
+    case 'ascii':
+      ret = _asciiWrite(this, string, offset, length)
+      break
+    case 'binary':
+      ret = _binaryWrite(this, string, offset, length)
+      break
+    case 'base64':
+      ret = _base64Write(this, string, offset, length)
+      break
+    case 'ucs2':
+    case 'ucs-2':
+    case 'utf16le':
+    case 'utf-16le':
+      ret = _utf16leWrite(this, string, offset, length)
+      break
+    default:
+      throw new Error('Unknown encoding')
+  }
+  return ret
+}
+
+Buffer.prototype.toString = function (encoding, start, end) {
+  var self = this
+
+  encoding = String(encoding || 'utf8').toLowerCase()
+  start = Number(start) || 0
+  end = (end !== undefined)
+    ? Number(end)
+    : end = self.length
+
+  // Fastpath empty strings
+  if (end === start)
+    return ''
+
+  var ret
+  switch (encoding) {
+    case 'hex':
+      ret = _hexSlice(self, start, end)
+      break
+    case 'utf8':
+    case 'utf-8':
+      ret = _utf8Slice(self, start, end)
+      break
+    case 'ascii':
+      ret = _asciiSlice(self, start, end)
+      break
+    case 'binary':
+      ret = _binarySlice(self, start, end)
+      break
+    case 'base64':
+      ret = _base64Slice(self, start, end)
+      break
+    case 'ucs2':
+    case 'ucs-2':
+    case 'utf16le':
+    case 'utf-16le':
+      ret = _utf16leSlice(self, start, end)
+      break
+    default:
+      throw new Error('Unknown encoding')
+  }
+  return ret
+}
+
+Buffer.prototype.toJSON = function () {
+  return {
+    type: 'Buffer',
+    data: Array.prototype.slice.call(this._arr || this, 0)
+  }
+}
+
+// copy(targetBuffer, targetStart=0, sourceStart=0, sourceEnd=buffer.length)
+Buffer.prototype.copy = function (target, target_start, start, end) {
+  var source = this
+
+  if (!start) start = 0
+  if (!end && end !== 0) end = this.length
+  if (!target_start) target_start = 0
+
+  // Copy 0 bytes; we're done
+  if (end === start) return
+  if (target.length === 0 || source.length === 0) return
+
+  // Fatal error conditions
+  assert(end >= start, 'sourceEnd < sourceStart')
+  assert(target_start >= 0 && target_start < target.length,
+      'targetStart out of bounds')
+  assert(start >= 0 && start < source.length, 'sourceStart out of bounds')
+  assert(end >= 0 && end <= source.length, 'sourceEnd out of bounds')
+
+  // Are we oob?
+  if (end > this.length)
+    end = this.length
+  if (target.length - target_start < end - start)
+    end = target.length - target_start + start
+
+  var len = end - start
+
+  if (len < 100 || !Buffer._useTypedArrays) {
+    for (var i = 0; i < len; i++)
+      target[i + target_start] = this[i + start]
+  } else {
+    target._set(this.subarray(start, start + len), target_start)
+  }
+}
+
+function _base64Slice (buf, start, end) {
+  if (start === 0 && end === buf.length) {
+    return base64.fromByteArray(buf)
+  } else {
+    return base64.fromByteArray(buf.slice(start, end))
+  }
+}
+
+function _utf8Slice (buf, start, end) {
+  var res = ''
+  var tmp = ''
+  end = Math.min(buf.length, end)
+
+  for (var i = start; i < end; i++) {
+    if (buf[i] <= 0x7F) {
+      res += decodeUtf8Char(tmp) + String.fromCharCode(buf[i])
+      tmp = ''
+    } else {
+      tmp += '%' + buf[i].toString(16)
+    }
+  }
+
+  return res + decodeUtf8Char(tmp)
+}
+
+function _asciiSlice (buf, start, end) {
+  var ret = ''
+  end = Math.min(buf.length, end)
+
+  for (var i = start; i < end; i++)
+    ret += String.fromCharCode(buf[i])
+  return ret
+}
+
+function _binarySlice (buf, start, end) {
+  return _asciiSlice(buf, start, end)
+}
+
+function _hexSlice (buf, start, end) {
+  var len = buf.length
+
+  if (!start || start < 0) start = 0
+  if (!end || end < 0 || end > len) end = len
+
+  var out = ''
+  for (var i = start; i < end; i++) {
+    out += toHex(buf[i])
+  }
+  return out
+}
+
+function _utf16leSlice (buf, start, end) {
+  var bytes = buf.slice(start, end)
+  var res = ''
+  for (var i = 0; i < bytes.length; i += 2) {
+    res += String.fromCharCode(bytes[i] + bytes[i+1] * 256)
+  }
+  return res
+}
+
+Buffer.prototype.slice = function (start, end) {
+  var len = this.length
+  start = clamp(start, len, 0)
+  end = clamp(end, len, len)
+
+  if (Buffer._useTypedArrays) {
+    return Buffer._augment(this.subarray(start, end))
+  } else {
+    var sliceLen = end - start
+    var newBuf = new Buffer(sliceLen, undefined, true)
+    for (var i = 0; i < sliceLen; i++) {
+      newBuf[i] = this[i + start]
+    }
+    return newBuf
+  }
+}
+
+// `get` will be removed in Node 0.13+
+Buffer.prototype.get = function (offset) {
+  console.log('.get() is deprecated. Access using array indexes instead.')
+  return this.readUInt8(offset)
+}
+
+// `set` will be removed in Node 0.13+
+Buffer.prototype.set = function (v, offset) {
+  console.log('.set() is deprecated. Access using array indexes instead.')
+  return this.writeUInt8(v, offset)
+}
+
+Buffer.prototype.readUInt8 = function (offset, noAssert) {
+  if (!noAssert) {
+    assert(offset !== undefined && offset !== null, 'missing offset')
+    assert(offset < this.length, 'Trying to read beyond buffer length')
+  }
+
+  if (offset >= this.length)
+    return
+
+  return this[offset]
+}
+
+function _readUInt16 (buf, offset, littleEndian, noAssert) {
+  if (!noAssert) {
+    assert(typeof littleEndian === 'boolean', 'missing or invalid endian')
+    assert(offset !== undefined && offset !== null, 'missing offset')
+    assert(offset + 1 < buf.length, 'Trying to read beyond buffer length')
+  }
+
+  var len = buf.length
+  if (offset >= len)
+    return
+
+  var val
+  if (littleEndian) {
+    val = buf[offset]
+    if (offset + 1 < len)
+      val |= buf[offset + 1] << 8
+  } else {
+    val = buf[offset] << 8
+    if (offset + 1 < len)
+      val |= buf[offset + 1]
+  }
+  return val
+}
+
+Buffer.prototype.readUInt16LE = function (offset, noAssert) {
+  return _readUInt16(this, offset, true, noAssert)
+}
+
+Buffer.prototype.readUInt16BE = function (offset, noAssert) {
+  return _readUInt16(this, offset, false, noAssert)
+}
+
+function _readUInt32 (buf, offset, littleEndian, noAssert) {
+  if (!noAssert) {
+    assert(typeof littleEndian === 'boolean', 'missing or invalid endian')
+    assert(offset !== undefined && offset !== null, 'missing offset')
+    assert(offset + 3 < buf.length, 'Trying to read beyond buffer length')
+  }
+
+  var len = buf.length
+  if (offset >= len)
+    return
+
+  var val
+  if (littleEndian) {
+    if (offset + 2 < len)
+      val = buf[offset + 2] << 16
+    if (offset + 1 < len)
+      val |= buf[offset + 1] << 8
+    val |= buf[offset]
+    if (offset + 3 < len)
+      val = val + (buf[offset + 3] << 24 >>> 0)
+  } else {
+    if (offset + 1 < len)
+      val = buf[offset + 1] << 16
+    if (offset + 2 < len)
+      val |= buf[offset + 2] << 8
+    if (offset + 3 < len)
+      val |= buf[offset + 3]
+    val = val + (buf[offset] << 24 >>> 0)
+  }
+  return val
+}
+
+Buffer.prototype.readUInt32LE = function (offset, noAssert) {
+  return _readUInt32(this, offset, true, noAssert)
+}
+
+Buffer.prototype.readUInt32BE = function (offset, noAssert) {
+  return _readUInt32(this, offset, false, noAssert)
+}
+
+Buffer.prototype.readInt8 = function (offset, noAssert) {
+  if (!noAssert) {
+    assert(offset !== undefined && offset !== null,
+        'missing offset')
+    assert(offset < this.length, 'Trying to read beyond buffer length')
+  }
+
+  if (offset >= this.length)
+    return
+
+  var neg = this[offset] & 0x80
+  if (neg)
+    return (0xff - this[offset] + 1) * -1
+  else
+    return this[offset]
+}
+
+function _readInt16 (buf, offset, littleEndian, noAssert) {
+  if (!noAssert) {
+    assert(typeof littleEndian === 'boolean', 'missing or invalid endian')
+    assert(offset !== undefined && offset !== null, 'missing offset')
+    assert(offset + 1 < buf.length, 'Trying to read beyond buffer length')
+  }
+
+  var len = buf.length
+  if (offset >= len)
+    return
+
+  var val = _readUInt16(buf, offset, littleEndian, true)
+  var neg = val & 0x8000
+  if (neg)
+    return (0xffff - val + 1) * -1
+  else
+    return val
+}
+
+Buffer.prototype.readInt16LE = function (offset, noAssert) {
+  return _readInt16(this, offset, true, noAssert)
+}
+
+Buffer.prototype.readInt16BE = function (offset, noAssert) {
+  return _readInt16(this, offset, false, noAssert)
+}
+
+function _readInt32 (buf, offset, littleEndian, noAssert) {
+  if (!noAssert) {
+    assert(typeof littleEndian === 'boolean', 'missing or invalid endian')
+    assert(offset !== undefined && offset !== null, 'missing offset')
+    assert(offset + 3 < buf.length, 'Trying to read beyond buffer length')
+  }
+
+  var len = buf.length
+  if (offset >= len)
+    return
+
+  var val = _readUInt32(buf, offset, littleEndian, true)
+  var neg = val & 0x80000000
+  if (neg)
+    return (0xffffffff - val + 1) * -1
+  else
+    return val
+}
+
+Buffer.prototype.readInt32LE = function (offset, noAssert) {
+  return _readInt32(this, offset, true, noAssert)
+}
+
+Buffer.prototype.readInt32BE = function (offset, noAssert) {
+  return _readInt32(this, offset, false, noAssert)
+}
+
+function _readFloat (buf, offset, littleEndian, noAssert) {
+  if (!noAssert) {
+    assert(typeof littleEndian === 'boolean', 'missing or invalid endian')
+    assert(offset + 3 < buf.length, 'Trying to read beyond buffer length')
+  }
+
+  return ieee754.read(buf, offset, littleEndian, 23, 4)
+}
+
+Buffer.prototype.readFloatLE = function (offset, noAssert) {
+  return _readFloat(this, offset, true, noAssert)
+}
+
+Buffer.prototype.readFloatBE = function (offset, noAssert) {
+  return _readFloat(this, offset, false, noAssert)
+}
+
+function _readDouble (buf, offset, littleEndian, noAssert) {
+  if (!noAssert) {
+    assert(typeof littleEndian === 'boolean', 'missing or invalid endian')
+    assert(offset + 7 < buf.length, 'Trying to read beyond buffer length')
+  }
+
+  return ieee754.read(buf, offset, littleEndian, 52, 8)
+}
+
+Buffer.prototype.readDoubleLE = function (offset, noAssert) {
+  return _readDouble(this, offset, true, noAssert)
+}
+
+Buffer.prototype.readDoubleBE = function (offset, noAssert) {
+  return _readDouble(this, offset, false, noAssert)
+}
+
+Buffer.prototype.writeUInt8 = function (value, offset, noAssert) {
+  if (!noAssert) {
+    assert(value !== undefined && value !== null, 'missing value')
+    assert(offset !== undefined && offset !== null, 'missing offset')
+    assert(offset < this.length, 'trying to write beyond buffer length')
+    verifuint(value, 0xff)
+  }
+
+  if (offset >= this.length) return
+
+  this[offset] = value
+}
+
+function _writeUInt16 (buf, value, offset, littleEndian, noAssert) {
+  if (!noAssert) {
+    assert(value !== undefined && value !== null, 'missing value')
+    assert(typeof littleEndian === 'boolean', 'missing or invalid endian')
+    assert(offset !== undefined && offset !== null, 'missing offset')
+    assert(offset + 1 < buf.length, 'trying to write beyond buffer length')
+    verifuint(value, 0xffff)
+  }
+
+  var len = buf.length
+  if (offset >= len)
+    return
+
+  for (var i = 0, j = Math.min(len - offset, 2); i < j; i++) {
+    buf[offset + i] =
+        (value & (0xff << (8 * (littleEndian ? i : 1 - i)))) >>>
+            (littleEndian ? i : 1 - i) * 8
+  }
+}
+
+Buffer.prototype.writeUInt16LE = function (value, offset, noAssert) {
+  _writeUInt16(this, value, offset, true, noAssert)
+}
+
+Buffer.prototype.writeUInt16BE = function (value, offset, noAssert) {
+  _writeUInt16(this, value, offset, false, noAssert)
+}
+
+function _writeUInt32 (buf, value, offset, littleEndian, noAssert) {
+  if (!noAssert) {
+    assert(value !== undefined && value !== null, 'missing value')
+    assert(typeof littleEndian === 'boolean', 'missing or invalid endian')
+    assert(offset !== undefined && offset !== null, 'missing offset')
+    assert(offset + 3 < buf.length, 'trying to write beyond buffer length')
+    verifuint(value, 0xffffffff)
+  }
+
+  var len = buf.length
+  if (offset >= len)
+    return
+
+  for (var i = 0, j = Math.min(len - offset, 4); i < j; i++) {
+    buf[offset + i] =
+        (value >>> (littleEndian ? i : 3 - i) * 8) & 0xff
+  }
+}
+
+Buffer.prototype.writeUInt32LE = function (value, offset, noAssert) {
+  _writeUInt32(this, value, offset, true, noAssert)
+}
+
+Buffer.prototype.writeUInt32BE = function (value, offset, noAssert) {
+  _writeUInt32(this, value, offset, false, noAssert)
+}
+
+Buffer.prototype.writeInt8 = function (value, offset, noAssert) {
+  if (!noAssert) {
+    assert(value !== undefined && value !== null, 'missing value')
+    assert(offset !== undefined && offset !== null, 'missing offset')
+    assert(offset < this.length, 'Trying to write beyond buffer length')
+    verifsint(value, 0x7f, -0x80)
+  }
+
+  if (offset >= this.length)
+    return
+
+  if (value >= 0)
+    this.writeUInt8(value, offset, noAssert)
+  else
+    this.writeUInt8(0xff + value + 1, offset, noAssert)
+}
+
+function _writeInt16 (buf, value, offset, littleEndian, noAssert) {
+  if (!noAssert) {
+    assert(value !== undefined && value !== null, 'missing value')
+    assert(typeof littleEndian === 'boolean', 'missing or invalid endian')
+    assert(offset !== undefined && offset !== null, 'missing offset')
+    assert(offset + 1 < buf.length, 'Trying to write beyond buffer length')
+    verifsint(value, 0x7fff, -0x8000)
+  }
+
+  var len = buf.length
+  if (offset >= len)
+    return
+
+  if (value >= 0)
+    _writeUInt16(buf, value, offset, littleEndian, noAssert)
+  else
+    _writeUInt16(buf, 0xffff + value + 1, offset, littleEndian, noAssert)
+}
+
+Buffer.prototype.writeInt16LE = function (value, offset, noAssert) {
+  _writeInt16(this, value, offset, true, noAssert)
+}
+
+Buffer.prototype.writeInt16BE = function (value, offset, noAssert) {
+  _writeInt16(this, value, offset, false, noAssert)
+}
+
+function _writeInt32 (buf, value, offset, littleEndian, noAssert) {
+  if (!noAssert) {
+    assert(value !== undefined && value !== null, 'missing value')
+    assert(typeof littleEndian === 'boolean', 'missing or invalid endian')
+    assert(offset !== undefined && offset !== null, 'missing offset')
+    assert(offset + 3 < buf.length, 'Trying to write beyond buffer length')
+    verifsint(value, 0x7fffffff, -0x80000000)
+  }
+
+  var len = buf.length
+  if (offset >= len)
+    return
+
+  if (value >= 0)
+    _writeUInt32(buf, value, offset, littleEndian, noAssert)
+  else
+    _writeUInt32(buf, 0xffffffff + value + 1, offset, littleEndian, noAssert)
+}
+
+Buffer.prototype.writeInt32LE = function (value, offset, noAssert) {
+  _writeInt32(this, value, offset, true, noAssert)
+}
+
+Buffer.prototype.writeInt32BE = function (value, offset, noAssert) {
+  _writeInt32(this, value, offset, false, noAssert)
+}
+
+function _writeFloat (buf, value, offset, littleEndian, noAssert) {
+  if (!noAssert) {
+    assert(value !== undefined && value !== null, 'missing value')
+    assert(typeof littleEndian === 'boolean', 'missing or invalid endian')
+    assert(offset !== undefined && offset !== null, 'missing offset')
+    assert(offset + 3 < buf.length, 'Trying to write beyond buffer length')
+    verifIEEE754(value, 3.4028234663852886e+38, -3.4028234663852886e+38)
+  }
+
+  var len = buf.length
+  if (offset >= len)
+    return
+
+  ieee754.write(buf, value, offset, littleEndian, 23, 4)
+}
+
+Buffer.prototype.writeFloatLE = function (value, offset, noAssert) {
+  _writeFloat(this, value, offset, true, noAssert)
+}
+
+Buffer.prototype.writeFloatBE = function (value, offset, noAssert) {
+  _writeFloat(this, value, offset, false, noAssert)
+}
+
+function _writeDouble (buf, value, offset, littleEndian, noAssert) {
+  if (!noAssert) {
+    assert(value !== undefined && value !== null, 'missing value')
+    assert(typeof littleEndian === 'boolean', 'missing or invalid endian')
+    assert(offset !== undefined && offset !== null, 'missing offset')
+    assert(offset + 7 < buf.length,
+        'Trying to write beyond buffer length')
+    verifIEEE754(value, 1.7976931348623157E+308, -1.7976931348623157E+308)
+  }
+
+  var len = buf.length
+  if (offset >= len)
+    return
+
+  ieee754.write(buf, value, offset, littleEndian, 52, 8)
+}
+
+Buffer.prototype.writeDoubleLE = function (value, offset, noAssert) {
+  _writeDouble(this, value, offset, true, noAssert)
+}
+
+Buffer.prototype.writeDoubleBE = function (value, offset, noAssert) {
+  _writeDouble(this, value, offset, false, noAssert)
+}
+
+// fill(value, start=0, end=buffer.length)
+Buffer.prototype.fill = function (value, start, end) {
+  if (!value) value = 0
+  if (!start) start = 0
+  if (!end) end = this.length
+
+  if (typeof value === 'string') {
+    value = value.charCodeAt(0)
+  }
+
+  assert(typeof value === 'number' && !isNaN(value), 'value is not a number')
+  assert(end >= start, 'end < start')
+
+  // Fill 0 bytes; we're done
+  if (end === start) return
+  if (this.length === 0) return
+
+  assert(start >= 0 && start < this.length, 'start out of bounds')
+  assert(end >= 0 && end <= this.length, 'end out of bounds')
+
+  for (var i = start; i < end; i++) {
+    this[i] = value
+  }
+}
+
+Buffer.prototype.inspect = function () {
+  var out = []
+  var len = this.length
+  for (var i = 0; i < len; i++) {
+    out[i] = toHex(this[i])
+    if (i === exports.INSPECT_MAX_BYTES) {
+      out[i + 1] = '...'
+      break
+    }
+  }
+  return '<Buffer ' + out.join(' ') + '>'
+}
+
+/**
+ * Creates a new `ArrayBuffer` with the *copied* memory of the buffer instance.
+ * Added in Node 0.12. Only available in browsers that support ArrayBuffer.
+ */
+Buffer.prototype.toArrayBuffer = function () {
+  if (typeof Uint8Array !== 'undefined') {
+    if (Buffer._useTypedArrays) {
+      return (new Buffer(this)).buffer
+    } else {
+      var buf = new Uint8Array(this.length)
+      for (var i = 0, len = buf.length; i < len; i += 1)
+        buf[i] = this[i]
+      return buf.buffer
+    }
+  } else {
+    throw new Error('Buffer.toArrayBuffer not supported in this browser')
+  }
+}
+
+// HELPER FUNCTIONS
+// ================
+
+function stringtrim (str) {
+  if (str.trim) return str.trim()
+  return str.replace(/^\s+|\s+$/g, '')
+}
+
+var BP = Buffer.prototype
+
+/**
+ * Augment a Uint8Array *instance* (not the Uint8Array class!) with Buffer methods
+ */
+Buffer._augment = function (arr) {
+  arr._isBuffer = true
+
+  // save reference to original Uint8Array get/set methods before overwriting
+  arr._get = arr.get
+  arr._set = arr.set
+
+  // deprecated, will be removed in node 0.13+
+  arr.get = BP.get
+  arr.set = BP.set
+
+  arr.write = BP.write
+  arr.toString = BP.toString
+  arr.toLocaleString = BP.toString
+  arr.toJSON = BP.toJSON
+  arr.copy = BP.copy
+  arr.slice = BP.slice
+  arr.readUInt8 = BP.readUInt8
+  arr.readUInt16LE = BP.readUInt16LE
+  arr.readUInt16BE = BP.readUInt16BE
+  arr.readUInt32LE = BP.readUInt32LE
+  arr.readUInt32BE = BP.readUInt32BE
+  arr.readInt8 = BP.readInt8
+  arr.readInt16LE = BP.readInt16LE
+  arr.readInt16BE = BP.readInt16BE
+  arr.readInt32LE = BP.readInt32LE
+  arr.readInt32BE = BP.readInt32BE
+  arr.readFloatLE = BP.readFloatLE
+  arr.readFloatBE = BP.readFloatBE
+  arr.readDoubleLE = BP.readDoubleLE
+  arr.readDoubleBE = BP.readDoubleBE
+  arr.writeUInt8 = BP.writeUInt8
+  arr.writeUInt16LE = BP.writeUInt16LE
+  arr.writeUInt16BE = BP.writeUInt16BE
+  arr.writeUInt32LE = BP.writeUInt32LE
+  arr.writeUInt32BE = BP.writeUInt32BE
+  arr.writeInt8 = BP.writeInt8
+  arr.writeInt16LE = BP.writeInt16LE
+  arr.writeInt16BE = BP.writeInt16BE
+  arr.writeInt32LE = BP.writeInt32LE
+  arr.writeInt32BE = BP.writeInt32BE
+  arr.writeFloatLE = BP.writeFloatLE
+  arr.writeFloatBE = BP.writeFloatBE
+  arr.writeDoubleLE = BP.writeDoubleLE
+  arr.writeDoubleBE = BP.writeDoubleBE
+  arr.fill = BP.fill
+  arr.inspect = BP.inspect
+  arr.toArrayBuffer = BP.toArrayBuffer
+
+  return arr
+}
+
+// slice(start, end)
+function clamp (index, len, defaultValue) {
+  if (typeof index !== 'number') return defaultValue
+  index = ~~index;  // Coerce to integer.
+  if (index >= len) return len
+  if (index >= 0) return index
+  index += len
+  if (index >= 0) return index
+  return 0
+}
+
+function coerce (length) {
+  // Coerce length to a number (possibly NaN), round up
+  // in case it's fractional (e.g. 123.456) then do a
+  // double negate to coerce a NaN to 0. Easy, right?
+  length = ~~Math.ceil(+length)
+  return length < 0 ? 0 : length
+}
+
+function isArray (subject) {
+  return (Array.isArray || function (subject) {
+    return Object.prototype.toString.call(subject) === '[object Array]'
+  })(subject)
+}
+
+function isArrayish (subject) {
+  return isArray(subject) || Buffer.isBuffer(subject) ||
+      subject && typeof subject === 'object' &&
+      typeof subject.length === 'number'
+}
+
+function toHex (n) {
+  if (n < 16) return '0' + n.toString(16)
+  return n.toString(16)
+}
+
+function utf8ToBytes (str) {
+  var byteArray = []
+  for (var i = 0; i < str.length; i++) {
+    var b = str.charCodeAt(i)
+    if (b <= 0x7F)
+      byteArray.push(str.charCodeAt(i))
+    else {
+      var start = i
+      if (b >= 0xD800 && b <= 0xDFFF) i++
+      var h = encodeURIComponent(str.slice(start, i+1)).substr(1).split('%')
+      for (var j = 0; j < h.length; j++)
+        byteArray.push(parseInt(h[j], 16))
+    }
+  }
+  return byteArray
+}
+
+function asciiToBytes (str) {
+  var byteArray = []
+  for (var i = 0; i < str.length; i++) {
+    // Node's code seems to be doing this and not & 0x7F..
+    byteArray.push(str.charCodeAt(i) & 0xFF)
+  }
+  return byteArray
+}
+
+function utf16leToBytes (str) {
+  var c, hi, lo
+  var byteArray = []
+  for (var i = 0; i < str.length; i++) {
+    c = str.charCodeAt(i)
+    hi = c >> 8
+    lo = c % 256
+    byteArray.push(lo)
+    byteArray.push(hi)
+  }
+
+  return byteArray
+}
+
+function base64ToBytes (str) {
+  return base64.toByteArray(str)
+}
+
+function blitBuffer (src, dst, offset, length) {
+  var pos
+  for (var i = 0; i < length; i++) {
+    if ((i + offset >= dst.length) || (i >= src.length))
+      break
+    dst[i + offset] = src[i]
+  }
+  return i
+}
+
+function decodeUtf8Char (str) {
+  try {
+    return decodeURIComponent(str)
+  } catch (err) {
+    return String.fromCharCode(0xFFFD) // UTF 8 invalid char
+  }
+}
+
+/*
+ * We have to make sure that the value is a valid integer. This means that it
+ * is non-negative. It has no fractional component and that it does not
+ * exceed the maximum allowed value.
+ */
+function verifuint (value, max) {
+  assert(typeof value === 'number', 'cannot write a non-number as a number')
+  assert(value >= 0, 'specified a negative value for writing an unsigned value')
+  assert(value <= max, 'value is larger than maximum value for type')
+  assert(Math.floor(value) === value, 'value has a fractional component')
+}
+
+function verifsint (value, max, min) {
+  assert(typeof value === 'number', 'cannot write a non-number as a number')
+  assert(value <= max, 'value larger than maximum allowed value')
+  assert(value >= min, 'value smaller than minimum allowed value')
+  assert(Math.floor(value) === value, 'value has a fractional component')
+}
+
+function verifIEEE754 (value, max, min) {
+  assert(typeof value === 'number', 'cannot write a non-number as a number')
+  assert(value <= max, 'value larger than maximum allowed value')
+  assert(value >= min, 'value smaller than minimum allowed value')
+}
+
+function assert (test, message) {
+  if (!test) throw new Error(message || 'Failed assertion')
+}
+
+},{"base64-js":4,"ieee754":5}],4:[function(require,module,exports){
+var lookup = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+
+;(function (exports) {
+	'use strict';
+
+  var Arr = (typeof Uint8Array !== 'undefined')
+    ? Uint8Array
+    : Array
+
+	var PLUS   = '+'.charCodeAt(0)
+	var SLASH  = '/'.charCodeAt(0)
+	var NUMBER = '0'.charCodeAt(0)
+	var LOWER  = 'a'.charCodeAt(0)
+	var UPPER  = 'A'.charCodeAt(0)
+
+	function decode (elt) {
+		var code = elt.charCodeAt(0)
+		if (code === PLUS)
+			return 62 // '+'
+		if (code === SLASH)
+			return 63 // '/'
+		if (code < NUMBER)
+			return -1 //no match
+		if (code < NUMBER + 10)
+			return code - NUMBER + 26 + 26
+		if (code < UPPER + 26)
+			return code - UPPER
+		if (code < LOWER + 26)
+			return code - LOWER + 26
+	}
+
+	function b64ToByteArray (b64) {
+		var i, j, l, tmp, placeHolders, arr
+
+		if (b64.length % 4 > 0) {
+			throw new Error('Invalid string. Length must be a multiple of 4')
+		}
+
+		// the number of equal signs (place holders)
+		// if there are two placeholders, than the two characters before it
+		// represent one byte
+		// if there is only one, then the three characters before it represent 2 bytes
+		// this is just a cheap hack to not do indexOf twice
+		var len = b64.length
+		placeHolders = '=' === b64.charAt(len - 2) ? 2 : '=' === b64.charAt(len - 1) ? 1 : 0
+
+		// base64 is 4/3 + up to two characters of the original data
+		arr = new Arr(b64.length * 3 / 4 - placeHolders)
+
+		// if there are placeholders, only get up to the last complete 4 chars
+		l = placeHolders > 0 ? b64.length - 4 : b64.length
+
+		var L = 0
+
+		function push (v) {
+			arr[L++] = v
+		}
+
+		for (i = 0, j = 0; i < l; i += 4, j += 3) {
+			tmp = (decode(b64.charAt(i)) << 18) | (decode(b64.charAt(i + 1)) << 12) | (decode(b64.charAt(i + 2)) << 6) | decode(b64.charAt(i + 3))
+			push((tmp & 0xFF0000) >> 16)
+			push((tmp & 0xFF00) >> 8)
+			push(tmp & 0xFF)
+		}
+
+		if (placeHolders === 2) {
+			tmp = (decode(b64.charAt(i)) << 2) | (decode(b64.charAt(i + 1)) >> 4)
+			push(tmp & 0xFF)
+		} else if (placeHolders === 1) {
+			tmp = (decode(b64.charAt(i)) << 10) | (decode(b64.charAt(i + 1)) << 4) | (decode(b64.charAt(i + 2)) >> 2)
+			push((tmp >> 8) & 0xFF)
+			push(tmp & 0xFF)
+		}
+
+		return arr
+	}
+
+	function uint8ToBase64 (uint8) {
+		var i,
+			extraBytes = uint8.length % 3, // if we have 1 byte left, pad 2 bytes
+			output = "",
+			temp, length
+
+		function encode (num) {
+			return lookup.charAt(num)
+		}
+
+		function tripletToBase64 (num) {
+			return encode(num >> 18 & 0x3F) + encode(num >> 12 & 0x3F) + encode(num >> 6 & 0x3F) + encode(num & 0x3F)
+		}
+
+		// go through the array every three bytes, we'll deal with trailing stuff later
+		for (i = 0, length = uint8.length - extraBytes; i < length; i += 3) {
+			temp = (uint8[i] << 16) + (uint8[i + 1] << 8) + (uint8[i + 2])
+			output += tripletToBase64(temp)
+		}
+
+		// pad the end with zeros, but make sure to not forget the extra bytes
+		switch (extraBytes) {
+			case 1:
+				temp = uint8[uint8.length - 1]
+				output += encode(temp >> 2)
+				output += encode((temp << 4) & 0x3F)
+				output += '=='
+				break
+			case 2:
+				temp = (uint8[uint8.length - 2] << 8) + (uint8[uint8.length - 1])
+				output += encode(temp >> 10)
+				output += encode((temp >> 4) & 0x3F)
+				output += encode((temp << 2) & 0x3F)
+				output += '='
+				break
+		}
+
+		return output
+	}
+
+	exports.toByteArray = b64ToByteArray
+	exports.fromByteArray = uint8ToBase64
+}(typeof exports === 'undefined' ? (this.base64js = {}) : exports))
+
+},{}],5:[function(require,module,exports){
+exports.read = function(buffer, offset, isLE, mLen, nBytes) {
+  var e, m,
+      eLen = nBytes * 8 - mLen - 1,
+      eMax = (1 << eLen) - 1,
+      eBias = eMax >> 1,
+      nBits = -7,
+      i = isLE ? (nBytes - 1) : 0,
+      d = isLE ? -1 : 1,
+      s = buffer[offset + i];
+
+  i += d;
+
+  e = s & ((1 << (-nBits)) - 1);
+  s >>= (-nBits);
+  nBits += eLen;
+  for (; nBits > 0; e = e * 256 + buffer[offset + i], i += d, nBits -= 8);
+
+  m = e & ((1 << (-nBits)) - 1);
+  e >>= (-nBits);
+  nBits += mLen;
+  for (; nBits > 0; m = m * 256 + buffer[offset + i], i += d, nBits -= 8);
+
+  if (e === 0) {
+    e = 1 - eBias;
+  } else if (e === eMax) {
+    return m ? NaN : ((s ? -1 : 1) * Infinity);
+  } else {
+    m = m + Math.pow(2, mLen);
+    e = e - eBias;
+  }
+  return (s ? -1 : 1) * m * Math.pow(2, e - mLen);
+};
+
+exports.write = function(buffer, value, offset, isLE, mLen, nBytes) {
+  var e, m, c,
+      eLen = nBytes * 8 - mLen - 1,
+      eMax = (1 << eLen) - 1,
+      eBias = eMax >> 1,
+      rt = (mLen === 23 ? Math.pow(2, -24) - Math.pow(2, -77) : 0),
+      i = isLE ? 0 : (nBytes - 1),
+      d = isLE ? 1 : -1,
+      s = value < 0 || (value === 0 && 1 / value < 0) ? 1 : 0;
+
+  value = Math.abs(value);
+
+  if (isNaN(value) || value === Infinity) {
+    m = isNaN(value) ? 1 : 0;
+    e = eMax;
+  } else {
+    e = Math.floor(Math.log(value) / Math.LN2);
+    if (value * (c = Math.pow(2, -e)) < 1) {
+      e--;
+      c *= 2;
+    }
+    if (e + eBias >= 1) {
+      value += rt / c;
+    } else {
+      value += rt * Math.pow(2, 1 - eBias);
+    }
+    if (value * c >= 2) {
+      e++;
+      c /= 2;
+    }
+
+    if (e + eBias >= eMax) {
+      m = 0;
+      e = eMax;
+    } else if (e + eBias >= 1) {
+      m = (value * c - 1) * Math.pow(2, mLen);
+      e = e + eBias;
+    } else {
+      m = value * Math.pow(2, eBias - 1) * Math.pow(2, mLen);
+      e = 0;
+    }
+  }
+
+  for (; mLen >= 8; buffer[offset + i] = m & 0xff, i += d, m /= 256, mLen -= 8);
+
+  e = (e << mLen) | m;
+  eLen += mLen;
+  for (; eLen > 0; buffer[offset + i] = e & 0xff, i += d, e /= 256, eLen -= 8);
+
+  buffer[offset + i - d] |= s * 128;
+};
+
+},{}],6:[function(require,module,exports){
 // shim for using process in browser
 
 var process = module.exports = {};
@@ -3090,7 +4337,7 @@ process.chdir = function (dir) {
     throw new Error('process.chdir is not supported');
 };
 
-},{}],4:[function(require,module,exports){
+},{}],7:[function(require,module,exports){
 /*!
  * jQuery JavaScript Library v2.1.1
  * http://jquery.com/
@@ -12282,7 +13529,7 @@ return jQuery;
 
 }));
 
-},{}],5:[function(require,module,exports){
+},{}],8:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -12316,7 +13563,7 @@ var AutoFocusMixin = {
 
 module.exports = AutoFocusMixin;
 
-},{"./focusNode":110}],6:[function(require,module,exports){
+},{"./focusNode":113}],9:[function(require,module,exports){
 /**
  * Copyright 2013 Facebook, Inc.
  *
@@ -12540,7 +13787,7 @@ var BeforeInputEventPlugin = {
 
 module.exports = BeforeInputEventPlugin;
 
-},{"./EventConstants":19,"./EventPropagators":24,"./ExecutionEnvironment":25,"./SyntheticInputEvent":90,"./keyOf":131}],7:[function(require,module,exports){
+},{"./EventConstants":22,"./EventPropagators":27,"./ExecutionEnvironment":28,"./SyntheticInputEvent":93,"./keyOf":134}],10:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -12663,7 +13910,7 @@ var CSSProperty = {
 
 module.exports = CSSProperty;
 
-},{}],8:[function(require,module,exports){
+},{}],11:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -12762,7 +14009,7 @@ var CSSPropertyOperations = {
 
 module.exports = CSSPropertyOperations;
 
-},{"./CSSProperty":7,"./dangerousStyleValue":105,"./hyphenateStyleName":122,"./memoizeStringOnly":133}],9:[function(require,module,exports){
+},{"./CSSProperty":10,"./dangerousStyleValue":108,"./hyphenateStyleName":125,"./memoizeStringOnly":136}],12:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2014 Facebook, Inc.
@@ -12869,7 +14116,7 @@ PooledClass.addPoolingTo(CallbackQueue);
 module.exports = CallbackQueue;
 
 }).call(this,require("+7ZJp0"))
-},{"+7ZJp0":3,"./PooledClass":30,"./invariant":124,"./mixInto":137}],10:[function(require,module,exports){
+},{"+7ZJp0":6,"./PooledClass":33,"./invariant":127,"./mixInto":140}],13:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -13258,7 +14505,7 @@ var ChangeEventPlugin = {
 
 module.exports = ChangeEventPlugin;
 
-},{"./EventConstants":19,"./EventPluginHub":21,"./EventPropagators":24,"./ExecutionEnvironment":25,"./ReactUpdates":80,"./SyntheticEvent":88,"./isEventSupported":125,"./isTextInputElement":127,"./keyOf":131}],11:[function(require,module,exports){
+},{"./EventConstants":22,"./EventPluginHub":24,"./EventPropagators":27,"./ExecutionEnvironment":28,"./ReactUpdates":83,"./SyntheticEvent":91,"./isEventSupported":128,"./isTextInputElement":130,"./keyOf":134}],14:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -13290,7 +14537,7 @@ var ClientReactRootIndex = {
 
 module.exports = ClientReactRootIndex;
 
-},{}],12:[function(require,module,exports){
+},{}],15:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -13556,7 +14803,7 @@ var CompositionEventPlugin = {
 
 module.exports = CompositionEventPlugin;
 
-},{"./EventConstants":19,"./EventPropagators":24,"./ExecutionEnvironment":25,"./ReactInputSelection":62,"./SyntheticCompositionEvent":86,"./getTextContentAccessor":119,"./keyOf":131}],13:[function(require,module,exports){
+},{"./EventConstants":22,"./EventPropagators":27,"./ExecutionEnvironment":28,"./ReactInputSelection":65,"./SyntheticCompositionEvent":89,"./getTextContentAccessor":122,"./keyOf":134}],16:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2014 Facebook, Inc.
@@ -13738,7 +14985,7 @@ var DOMChildrenOperations = {
 module.exports = DOMChildrenOperations;
 
 }).call(this,require("+7ZJp0"))
-},{"+7ZJp0":3,"./Danger":16,"./ReactMultiChildUpdateTypes":67,"./getTextContentAccessor":119,"./invariant":124}],14:[function(require,module,exports){
+},{"+7ZJp0":6,"./Danger":19,"./ReactMultiChildUpdateTypes":70,"./getTextContentAccessor":122,"./invariant":127}],17:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2014 Facebook, Inc.
@@ -14040,7 +15287,7 @@ var DOMProperty = {
 module.exports = DOMProperty;
 
 }).call(this,require("+7ZJp0"))
-},{"+7ZJp0":3,"./invariant":124}],15:[function(require,module,exports){
+},{"+7ZJp0":6,"./invariant":127}],18:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2014 Facebook, Inc.
@@ -14237,7 +15484,7 @@ var DOMPropertyOperations = {
 module.exports = DOMPropertyOperations;
 
 }).call(this,require("+7ZJp0"))
-},{"+7ZJp0":3,"./DOMProperty":14,"./escapeTextForBrowser":108,"./memoizeStringOnly":133,"./warning":147}],16:[function(require,module,exports){
+},{"+7ZJp0":6,"./DOMProperty":17,"./escapeTextForBrowser":111,"./memoizeStringOnly":136,"./warning":150}],19:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2014 Facebook, Inc.
@@ -14428,7 +15675,7 @@ var Danger = {
 module.exports = Danger;
 
 }).call(this,require("+7ZJp0"))
-},{"+7ZJp0":3,"./ExecutionEnvironment":25,"./createNodesFromMarkup":104,"./emptyFunction":106,"./getMarkupWrap":116,"./invariant":124}],17:[function(require,module,exports){
+},{"+7ZJp0":6,"./ExecutionEnvironment":28,"./createNodesFromMarkup":107,"./emptyFunction":109,"./getMarkupWrap":119,"./invariant":127}],20:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -14475,7 +15722,7 @@ var DefaultEventPluginOrder = [
 
 module.exports = DefaultEventPluginOrder;
 
-},{"./keyOf":131}],18:[function(require,module,exports){
+},{"./keyOf":134}],21:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -14622,7 +15869,7 @@ var EnterLeaveEventPlugin = {
 
 module.exports = EnterLeaveEventPlugin;
 
-},{"./EventConstants":19,"./EventPropagators":24,"./ReactMount":65,"./SyntheticMouseEvent":92,"./keyOf":131}],19:[function(require,module,exports){
+},{"./EventConstants":22,"./EventPropagators":27,"./ReactMount":68,"./SyntheticMouseEvent":95,"./keyOf":134}],22:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -14701,7 +15948,7 @@ var EventConstants = {
 
 module.exports = EventConstants;
 
-},{"./keyMirror":130}],20:[function(require,module,exports){
+},{"./keyMirror":133}],23:[function(require,module,exports){
 (function (process){
 /**
  * @providesModule EventListener
@@ -14777,7 +16024,7 @@ var EventListener = {
 module.exports = EventListener;
 
 }).call(this,require("+7ZJp0"))
-},{"+7ZJp0":3,"./emptyFunction":106}],21:[function(require,module,exports){
+},{"+7ZJp0":6,"./emptyFunction":109}],24:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2014 Facebook, Inc.
@@ -15071,7 +16318,7 @@ var EventPluginHub = {
 module.exports = EventPluginHub;
 
 }).call(this,require("+7ZJp0"))
-},{"+7ZJp0":3,"./EventPluginRegistry":22,"./EventPluginUtils":23,"./accumulate":98,"./forEachAccumulated":111,"./invariant":124,"./isEventSupported":125,"./monitorCodeUse":138}],22:[function(require,module,exports){
+},{"+7ZJp0":6,"./EventPluginRegistry":25,"./EventPluginUtils":26,"./accumulate":101,"./forEachAccumulated":114,"./invariant":127,"./isEventSupported":128,"./monitorCodeUse":141}],25:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2014 Facebook, Inc.
@@ -15358,7 +16605,7 @@ var EventPluginRegistry = {
 module.exports = EventPluginRegistry;
 
 }).call(this,require("+7ZJp0"))
-},{"+7ZJp0":3,"./invariant":124}],23:[function(require,module,exports){
+},{"+7ZJp0":6,"./invariant":127}],26:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2014 Facebook, Inc.
@@ -15586,7 +16833,7 @@ var EventPluginUtils = {
 module.exports = EventPluginUtils;
 
 }).call(this,require("+7ZJp0"))
-},{"+7ZJp0":3,"./EventConstants":19,"./invariant":124}],24:[function(require,module,exports){
+},{"+7ZJp0":6,"./EventConstants":22,"./invariant":127}],27:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2014 Facebook, Inc.
@@ -15733,7 +16980,7 @@ var EventPropagators = {
 module.exports = EventPropagators;
 
 }).call(this,require("+7ZJp0"))
-},{"+7ZJp0":3,"./EventConstants":19,"./EventPluginHub":21,"./accumulate":98,"./forEachAccumulated":111}],25:[function(require,module,exports){
+},{"+7ZJp0":6,"./EventConstants":22,"./EventPluginHub":24,"./accumulate":101,"./forEachAccumulated":114}],28:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -15785,7 +17032,7 @@ var ExecutionEnvironment = {
 
 module.exports = ExecutionEnvironment;
 
-},{}],26:[function(require,module,exports){
+},{}],29:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -15897,7 +17144,6 @@ var HTMLDOMPropertyConfig = {
     loop: MUST_USE_PROPERTY | HAS_BOOLEAN_VALUE,
     max: null,
     maxLength: MUST_USE_ATTRIBUTE,
-    media: MUST_USE_ATTRIBUTE,
     mediaGroup: null,
     method: null,
     min: null,
@@ -15905,7 +17151,6 @@ var HTMLDOMPropertyConfig = {
     muted: MUST_USE_PROPERTY | HAS_BOOLEAN_VALUE,
     name: null,
     noValidate: HAS_BOOLEAN_VALUE,
-    open: null,
     pattern: null,
     placeholder: null,
     poster: null,
@@ -15926,12 +17171,11 @@ var HTMLDOMPropertyConfig = {
     selected: MUST_USE_PROPERTY | HAS_BOOLEAN_VALUE,
     shape: null,
     size: MUST_USE_ATTRIBUTE | HAS_POSITIVE_NUMERIC_VALUE,
-    sizes: MUST_USE_ATTRIBUTE,
     span: HAS_POSITIVE_NUMERIC_VALUE,
     spellCheck: null,
     src: null,
     srcDoc: MUST_USE_PROPERTY,
-    srcSet: MUST_USE_ATTRIBUTE,
+    srcSet: null,
     start: HAS_NUMERIC_VALUE,
     step: null,
     style: null,
@@ -15976,7 +17220,7 @@ var HTMLDOMPropertyConfig = {
 
 module.exports = HTMLDOMPropertyConfig;
 
-},{"./DOMProperty":14,"./ExecutionEnvironment":25}],27:[function(require,module,exports){
+},{"./DOMProperty":17,"./ExecutionEnvironment":28}],30:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2014 Facebook, Inc.
@@ -16139,7 +17383,7 @@ var LinkedValueUtils = {
 module.exports = LinkedValueUtils;
 
 }).call(this,require("+7ZJp0"))
-},{"+7ZJp0":3,"./ReactPropTypes":73,"./invariant":124}],28:[function(require,module,exports){
+},{"+7ZJp0":6,"./ReactPropTypes":76,"./invariant":127}],31:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2014 Facebook, Inc.
@@ -16195,7 +17439,7 @@ var LocalEventTrapMixin = {
 module.exports = LocalEventTrapMixin;
 
 }).call(this,require("+7ZJp0"))
-},{"+7ZJp0":3,"./ReactBrowserEventEmitter":33,"./accumulate":98,"./forEachAccumulated":111,"./invariant":124}],29:[function(require,module,exports){
+},{"+7ZJp0":6,"./ReactBrowserEventEmitter":36,"./accumulate":101,"./forEachAccumulated":114,"./invariant":127}],32:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -16260,7 +17504,7 @@ var MobileSafariClickEventPlugin = {
 
 module.exports = MobileSafariClickEventPlugin;
 
-},{"./EventConstants":19,"./emptyFunction":106}],30:[function(require,module,exports){
+},{"./EventConstants":22,"./emptyFunction":109}],33:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2014 Facebook, Inc.
@@ -16383,7 +17627,7 @@ var PooledClass = {
 module.exports = PooledClass;
 
 }).call(this,require("+7ZJp0"))
-},{"+7ZJp0":3,"./invariant":124}],31:[function(require,module,exports){
+},{"+7ZJp0":6,"./invariant":127}],34:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2014 Facebook, Inc.
@@ -16425,20 +17669,8 @@ var ReactServerRendering = require("./ReactServerRendering");
 var ReactTextComponent = require("./ReactTextComponent");
 
 var onlyChild = require("./onlyChild");
-var warning = require("./warning");
 
 ReactDefaultInjection.inject();
-
-// Specifying arguments isn't necessary since we just use apply anyway, but it
-// makes it clear for those actually consuming this API.
-function createDescriptor(type, props, children) {
-  var args = Array.prototype.slice.call(arguments, 1);
-  return type.apply(null, args);
-}
-
-if ("production" !== process.env.NODE_ENV) {
-  var _warnedForDeprecation = false;
-}
 
 var React = {
   Children: {
@@ -16453,18 +17685,10 @@ var React = {
     EventPluginUtils.useTouchEvents = shouldUseTouch;
   },
   createClass: ReactCompositeComponent.createClass,
-  createDescriptor: function() {
-    if ("production" !== process.env.NODE_ENV) {
-      ("production" !== process.env.NODE_ENV ? warning(
-        _warnedForDeprecation,
-        'React.createDescriptor is deprecated and will be removed in the ' +
-        'next version of React. Use React.createElement instead.'
-      ) : null);
-      _warnedForDeprecation = true;
-    }
-    return createDescriptor.apply(this, arguments);
+  createDescriptor: function(type, props, children) {
+    var args = Array.prototype.slice.call(arguments, 1);
+    return type.apply(null, args);
   },
-  createElement: createDescriptor,
   constructAndRenderComponent: ReactMount.constructAndRenderComponent,
   constructAndRenderComponentByID: ReactMount.constructAndRenderComponentByID,
   renderComponent: ReactPerf.measure(
@@ -16533,12 +17757,12 @@ if ("production" !== process.env.NODE_ENV) {
 
 // Version exists only in the open-source version of React, not in Facebook's
 // internal version.
-React.version = '0.11.2';
+React.version = '0.11.1';
 
 module.exports = React;
 
 }).call(this,require("+7ZJp0"))
-},{"+7ZJp0":3,"./DOMPropertyOperations":15,"./EventPluginUtils":23,"./ExecutionEnvironment":25,"./ReactChildren":34,"./ReactComponent":35,"./ReactCompositeComponent":37,"./ReactContext":38,"./ReactCurrentOwner":39,"./ReactDOM":40,"./ReactDOMComponent":42,"./ReactDefaultInjection":52,"./ReactDescriptor":55,"./ReactInstanceHandles":63,"./ReactMount":65,"./ReactMultiChild":66,"./ReactPerf":69,"./ReactPropTypes":73,"./ReactServerRendering":77,"./ReactTextComponent":79,"./onlyChild":139,"./warning":147}],32:[function(require,module,exports){
+},{"+7ZJp0":6,"./DOMPropertyOperations":18,"./EventPluginUtils":26,"./ExecutionEnvironment":28,"./ReactChildren":37,"./ReactComponent":38,"./ReactCompositeComponent":40,"./ReactContext":41,"./ReactCurrentOwner":42,"./ReactDOM":43,"./ReactDOMComponent":45,"./ReactDefaultInjection":55,"./ReactDescriptor":58,"./ReactInstanceHandles":66,"./ReactMount":68,"./ReactMultiChild":69,"./ReactPerf":72,"./ReactPropTypes":76,"./ReactServerRendering":80,"./ReactTextComponent":82,"./onlyChild":142}],35:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2014 Facebook, Inc.
@@ -16588,7 +17812,7 @@ var ReactBrowserComponentMixin = {
 module.exports = ReactBrowserComponentMixin;
 
 }).call(this,require("+7ZJp0"))
-},{"+7ZJp0":3,"./ReactEmptyComponent":57,"./ReactMount":65,"./invariant":124}],33:[function(require,module,exports){
+},{"+7ZJp0":6,"./ReactEmptyComponent":60,"./ReactMount":68,"./invariant":127}],36:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -16950,7 +18174,7 @@ var ReactBrowserEventEmitter = merge(ReactEventEmitterMixin, {
 
 module.exports = ReactBrowserEventEmitter;
 
-},{"./EventConstants":19,"./EventPluginHub":21,"./EventPluginRegistry":22,"./ReactEventEmitterMixin":59,"./ViewportMetrics":97,"./isEventSupported":125,"./merge":134}],34:[function(require,module,exports){
+},{"./EventConstants":22,"./EventPluginHub":24,"./EventPluginRegistry":25,"./ReactEventEmitterMixin":62,"./ViewportMetrics":100,"./isEventSupported":128,"./merge":137}],37:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2014 Facebook, Inc.
@@ -17107,7 +18331,7 @@ var ReactChildren = {
 module.exports = ReactChildren;
 
 }).call(this,require("+7ZJp0"))
-},{"+7ZJp0":3,"./PooledClass":30,"./traverseAllChildren":146,"./warning":147}],35:[function(require,module,exports){
+},{"+7ZJp0":6,"./PooledClass":33,"./traverseAllChildren":149,"./warning":150}],38:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2014 Facebook, Inc.
@@ -17557,7 +18781,7 @@ var ReactComponent = {
 module.exports = ReactComponent;
 
 }).call(this,require("+7ZJp0"))
-},{"+7ZJp0":3,"./ReactDescriptor":55,"./ReactOwner":68,"./ReactUpdates":80,"./invariant":124,"./keyMirror":130,"./merge":134}],36:[function(require,module,exports){
+},{"+7ZJp0":6,"./ReactDescriptor":58,"./ReactOwner":71,"./ReactUpdates":83,"./invariant":127,"./keyMirror":133,"./merge":137}],39:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2014 Facebook, Inc.
@@ -17686,7 +18910,7 @@ var ReactComponentBrowserEnvironment = {
 module.exports = ReactComponentBrowserEnvironment;
 
 }).call(this,require("+7ZJp0"))
-},{"+7ZJp0":3,"./ReactDOMIDOperations":44,"./ReactMarkupChecksum":64,"./ReactMount":65,"./ReactPerf":69,"./ReactReconcileTransaction":75,"./getReactRootElementInContainer":118,"./invariant":124,"./setInnerHTML":142}],37:[function(require,module,exports){
+},{"+7ZJp0":6,"./ReactDOMIDOperations":47,"./ReactMarkupChecksum":67,"./ReactMount":68,"./ReactPerf":72,"./ReactReconcileTransaction":78,"./getReactRootElementInContainer":121,"./invariant":127,"./setInnerHTML":145}],40:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2014 Facebook, Inc.
@@ -19115,7 +20339,7 @@ var ReactCompositeComponent = {
 module.exports = ReactCompositeComponent;
 
 }).call(this,require("+7ZJp0"))
-},{"+7ZJp0":3,"./ReactComponent":35,"./ReactContext":38,"./ReactCurrentOwner":39,"./ReactDescriptor":55,"./ReactDescriptorValidator":56,"./ReactEmptyComponent":57,"./ReactErrorUtils":58,"./ReactOwner":68,"./ReactPerf":69,"./ReactPropTransferer":70,"./ReactPropTypeLocationNames":71,"./ReactPropTypeLocations":72,"./ReactUpdates":80,"./instantiateReactComponent":123,"./invariant":124,"./keyMirror":130,"./mapObject":132,"./merge":134,"./mixInto":137,"./monitorCodeUse":138,"./shouldUpdateReactComponent":144,"./warning":147}],38:[function(require,module,exports){
+},{"+7ZJp0":6,"./ReactComponent":38,"./ReactContext":41,"./ReactCurrentOwner":42,"./ReactDescriptor":58,"./ReactDescriptorValidator":59,"./ReactEmptyComponent":60,"./ReactErrorUtils":61,"./ReactOwner":71,"./ReactPerf":72,"./ReactPropTransferer":73,"./ReactPropTypeLocationNames":74,"./ReactPropTypeLocations":75,"./ReactUpdates":83,"./instantiateReactComponent":126,"./invariant":127,"./keyMirror":133,"./mapObject":135,"./merge":137,"./mixInto":140,"./monitorCodeUse":141,"./shouldUpdateReactComponent":147,"./warning":150}],41:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -19184,7 +20408,7 @@ var ReactContext = {
 
 module.exports = ReactContext;
 
-},{"./merge":134}],39:[function(require,module,exports){
+},{"./merge":137}],42:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -19225,7 +20449,7 @@ var ReactCurrentOwner = {
 
 module.exports = ReactCurrentOwner;
 
-},{}],40:[function(require,module,exports){
+},{}],43:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2014 Facebook, Inc.
@@ -19324,7 +20548,6 @@ var ReactDOM = mapObject({
   del: false,
   details: false,
   dfn: false,
-  dialog: false,
   div: false,
   dl: false,
   dt: false,
@@ -19372,7 +20595,6 @@ var ReactDOM = mapObject({
   output: false,
   p: false,
   param: true,
-  picture: false,
   pre: false,
   progress: false,
   q: false,
@@ -19440,7 +20662,7 @@ ReactDOM.injection = injection;
 module.exports = ReactDOM;
 
 }).call(this,require("+7ZJp0"))
-},{"+7ZJp0":3,"./ReactDOMComponent":42,"./ReactDescriptor":55,"./ReactDescriptorValidator":56,"./mapObject":132,"./mergeInto":136}],41:[function(require,module,exports){
+},{"+7ZJp0":6,"./ReactDOMComponent":45,"./ReactDescriptor":58,"./ReactDescriptorValidator":59,"./mapObject":135,"./mergeInto":139}],44:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -19511,7 +20733,7 @@ var ReactDOMButton = ReactCompositeComponent.createClass({
 
 module.exports = ReactDOMButton;
 
-},{"./AutoFocusMixin":5,"./ReactBrowserComponentMixin":32,"./ReactCompositeComponent":37,"./ReactDOM":40,"./keyMirror":130}],42:[function(require,module,exports){
+},{"./AutoFocusMixin":8,"./ReactBrowserComponentMixin":35,"./ReactCompositeComponent":40,"./ReactDOM":43,"./keyMirror":133}],45:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2014 Facebook, Inc.
@@ -19933,7 +21155,7 @@ mixInto(ReactDOMComponent, ReactBrowserComponentMixin);
 module.exports = ReactDOMComponent;
 
 }).call(this,require("+7ZJp0"))
-},{"+7ZJp0":3,"./CSSPropertyOperations":8,"./DOMProperty":14,"./DOMPropertyOperations":15,"./ReactBrowserComponentMixin":32,"./ReactBrowserEventEmitter":33,"./ReactComponent":35,"./ReactMount":65,"./ReactMultiChild":66,"./ReactPerf":69,"./escapeTextForBrowser":108,"./invariant":124,"./keyOf":131,"./merge":134,"./mixInto":137}],43:[function(require,module,exports){
+},{"+7ZJp0":6,"./CSSPropertyOperations":11,"./DOMProperty":17,"./DOMPropertyOperations":18,"./ReactBrowserComponentMixin":35,"./ReactBrowserEventEmitter":36,"./ReactComponent":38,"./ReactMount":68,"./ReactMultiChild":69,"./ReactPerf":72,"./escapeTextForBrowser":111,"./invariant":127,"./keyOf":134,"./merge":137,"./mixInto":140}],46:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -19989,7 +21211,7 @@ var ReactDOMForm = ReactCompositeComponent.createClass({
 
 module.exports = ReactDOMForm;
 
-},{"./EventConstants":19,"./LocalEventTrapMixin":28,"./ReactBrowserComponentMixin":32,"./ReactCompositeComponent":37,"./ReactDOM":40}],44:[function(require,module,exports){
+},{"./EventConstants":22,"./LocalEventTrapMixin":31,"./ReactBrowserComponentMixin":35,"./ReactCompositeComponent":40,"./ReactDOM":43}],47:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2014 Facebook, Inc.
@@ -20182,7 +21404,7 @@ var ReactDOMIDOperations = {
 module.exports = ReactDOMIDOperations;
 
 }).call(this,require("+7ZJp0"))
-},{"+7ZJp0":3,"./CSSPropertyOperations":8,"./DOMChildrenOperations":13,"./DOMPropertyOperations":15,"./ReactMount":65,"./ReactPerf":69,"./invariant":124,"./setInnerHTML":142}],45:[function(require,module,exports){
+},{"+7ZJp0":6,"./CSSPropertyOperations":11,"./DOMChildrenOperations":16,"./DOMPropertyOperations":18,"./ReactMount":68,"./ReactPerf":72,"./invariant":127,"./setInnerHTML":145}],48:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -20236,7 +21458,7 @@ var ReactDOMImg = ReactCompositeComponent.createClass({
 
 module.exports = ReactDOMImg;
 
-},{"./EventConstants":19,"./LocalEventTrapMixin":28,"./ReactBrowserComponentMixin":32,"./ReactCompositeComponent":37,"./ReactDOM":40}],46:[function(require,module,exports){
+},{"./EventConstants":22,"./LocalEventTrapMixin":31,"./ReactBrowserComponentMixin":35,"./ReactCompositeComponent":40,"./ReactDOM":43}],49:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2014 Facebook, Inc.
@@ -20422,7 +21644,7 @@ var ReactDOMInput = ReactCompositeComponent.createClass({
 module.exports = ReactDOMInput;
 
 }).call(this,require("+7ZJp0"))
-},{"+7ZJp0":3,"./AutoFocusMixin":5,"./DOMPropertyOperations":15,"./LinkedValueUtils":27,"./ReactBrowserComponentMixin":32,"./ReactCompositeComponent":37,"./ReactDOM":40,"./ReactMount":65,"./invariant":124,"./merge":134}],47:[function(require,module,exports){
+},{"+7ZJp0":6,"./AutoFocusMixin":8,"./DOMPropertyOperations":18,"./LinkedValueUtils":30,"./ReactBrowserComponentMixin":35,"./ReactCompositeComponent":40,"./ReactDOM":43,"./ReactMount":68,"./invariant":127,"./merge":137}],50:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2014 Facebook, Inc.
@@ -20481,7 +21703,7 @@ var ReactDOMOption = ReactCompositeComponent.createClass({
 module.exports = ReactDOMOption;
 
 }).call(this,require("+7ZJp0"))
-},{"+7ZJp0":3,"./ReactBrowserComponentMixin":32,"./ReactCompositeComponent":37,"./ReactDOM":40,"./warning":147}],48:[function(require,module,exports){
+},{"+7ZJp0":6,"./ReactBrowserComponentMixin":35,"./ReactCompositeComponent":40,"./ReactDOM":43,"./warning":150}],51:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -20664,7 +21886,7 @@ var ReactDOMSelect = ReactCompositeComponent.createClass({
 
 module.exports = ReactDOMSelect;
 
-},{"./AutoFocusMixin":5,"./LinkedValueUtils":27,"./ReactBrowserComponentMixin":32,"./ReactCompositeComponent":37,"./ReactDOM":40,"./merge":134}],49:[function(require,module,exports){
+},{"./AutoFocusMixin":8,"./LinkedValueUtils":30,"./ReactBrowserComponentMixin":35,"./ReactCompositeComponent":40,"./ReactDOM":43,"./merge":137}],52:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -20880,7 +22102,7 @@ var ReactDOMSelection = {
 
 module.exports = ReactDOMSelection;
 
-},{"./ExecutionEnvironment":25,"./getNodeForCharacterOffset":117,"./getTextContentAccessor":119}],50:[function(require,module,exports){
+},{"./ExecutionEnvironment":28,"./getNodeForCharacterOffset":120,"./getTextContentAccessor":122}],53:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2014 Facebook, Inc.
@@ -21026,7 +22248,7 @@ var ReactDOMTextarea = ReactCompositeComponent.createClass({
 module.exports = ReactDOMTextarea;
 
 }).call(this,require("+7ZJp0"))
-},{"+7ZJp0":3,"./AutoFocusMixin":5,"./DOMPropertyOperations":15,"./LinkedValueUtils":27,"./ReactBrowserComponentMixin":32,"./ReactCompositeComponent":37,"./ReactDOM":40,"./invariant":124,"./merge":134,"./warning":147}],51:[function(require,module,exports){
+},{"+7ZJp0":6,"./AutoFocusMixin":8,"./DOMPropertyOperations":18,"./LinkedValueUtils":30,"./ReactBrowserComponentMixin":35,"./ReactCompositeComponent":40,"./ReactDOM":43,"./invariant":127,"./merge":137,"./warning":150}],54:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -21103,7 +22325,7 @@ var ReactDefaultBatchingStrategy = {
 
 module.exports = ReactDefaultBatchingStrategy;
 
-},{"./ReactUpdates":80,"./Transaction":96,"./emptyFunction":106,"./mixInto":137}],52:[function(require,module,exports){
+},{"./ReactUpdates":83,"./Transaction":99,"./emptyFunction":109,"./mixInto":140}],55:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2014 Facebook, Inc.
@@ -21235,7 +22457,7 @@ module.exports = {
 };
 
 }).call(this,require("+7ZJp0"))
-},{"+7ZJp0":3,"./BeforeInputEventPlugin":6,"./ChangeEventPlugin":10,"./ClientReactRootIndex":11,"./CompositionEventPlugin":12,"./DefaultEventPluginOrder":17,"./EnterLeaveEventPlugin":18,"./ExecutionEnvironment":25,"./HTMLDOMPropertyConfig":26,"./MobileSafariClickEventPlugin":29,"./ReactBrowserComponentMixin":32,"./ReactComponentBrowserEnvironment":36,"./ReactDOM":40,"./ReactDOMButton":41,"./ReactDOMForm":43,"./ReactDOMImg":45,"./ReactDOMInput":46,"./ReactDOMOption":47,"./ReactDOMSelect":48,"./ReactDOMTextarea":50,"./ReactDefaultBatchingStrategy":51,"./ReactDefaultPerf":53,"./ReactEventListener":60,"./ReactInjection":61,"./ReactInstanceHandles":63,"./ReactMount":65,"./SVGDOMPropertyConfig":81,"./SelectEventPlugin":82,"./ServerReactRootIndex":83,"./SimpleEventPlugin":84,"./createFullPageComponent":103}],53:[function(require,module,exports){
+},{"+7ZJp0":6,"./BeforeInputEventPlugin":9,"./ChangeEventPlugin":13,"./ClientReactRootIndex":14,"./CompositionEventPlugin":15,"./DefaultEventPluginOrder":20,"./EnterLeaveEventPlugin":21,"./ExecutionEnvironment":28,"./HTMLDOMPropertyConfig":29,"./MobileSafariClickEventPlugin":32,"./ReactBrowserComponentMixin":35,"./ReactComponentBrowserEnvironment":39,"./ReactDOM":43,"./ReactDOMButton":44,"./ReactDOMForm":46,"./ReactDOMImg":48,"./ReactDOMInput":49,"./ReactDOMOption":50,"./ReactDOMSelect":51,"./ReactDOMTextarea":53,"./ReactDefaultBatchingStrategy":54,"./ReactDefaultPerf":56,"./ReactEventListener":63,"./ReactInjection":64,"./ReactInstanceHandles":66,"./ReactMount":68,"./SVGDOMPropertyConfig":84,"./SelectEventPlugin":85,"./ServerReactRootIndex":86,"./SimpleEventPlugin":87,"./createFullPageComponent":106}],56:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -21498,7 +22720,7 @@ var ReactDefaultPerf = {
 
 module.exports = ReactDefaultPerf;
 
-},{"./DOMProperty":14,"./ReactDefaultPerfAnalysis":54,"./ReactMount":65,"./ReactPerf":69,"./performanceNow":141}],54:[function(require,module,exports){
+},{"./DOMProperty":17,"./ReactDefaultPerfAnalysis":57,"./ReactMount":68,"./ReactPerf":72,"./performanceNow":144}],57:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -21703,7 +22925,7 @@ var ReactDefaultPerfAnalysis = {
 
 module.exports = ReactDefaultPerfAnalysis;
 
-},{"./merge":134}],55:[function(require,module,exports){
+},{"./merge":137}],58:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2014 Facebook, Inc.
@@ -21958,7 +23180,7 @@ ReactDescriptor.isValidDescriptor = function(object) {
 module.exports = ReactDescriptor;
 
 }).call(this,require("+7ZJp0"))
-},{"+7ZJp0":3,"./ReactContext":38,"./ReactCurrentOwner":39,"./merge":134,"./warning":147}],56:[function(require,module,exports){
+},{"+7ZJp0":6,"./ReactContext":41,"./ReactCurrentOwner":42,"./merge":137,"./warning":150}],59:[function(require,module,exports){
 /**
  * Copyright 2014 Facebook, Inc.
  *
@@ -22243,7 +23465,7 @@ var ReactDescriptorValidator = {
 
 module.exports = ReactDescriptorValidator;
 
-},{"./ReactCurrentOwner":39,"./ReactDescriptor":55,"./ReactPropTypeLocations":72,"./monitorCodeUse":138}],57:[function(require,module,exports){
+},{"./ReactCurrentOwner":42,"./ReactDescriptor":58,"./ReactPropTypeLocations":75,"./monitorCodeUse":141}],60:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2014 Facebook, Inc.
@@ -22325,7 +23547,7 @@ var ReactEmptyComponent = {
 module.exports = ReactEmptyComponent;
 
 }).call(this,require("+7ZJp0"))
-},{"+7ZJp0":3,"./invariant":124}],58:[function(require,module,exports){
+},{"+7ZJp0":6,"./invariant":127}],61:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -22364,7 +23586,7 @@ var ReactErrorUtils = {
 
 module.exports = ReactErrorUtils;
 
-},{}],59:[function(require,module,exports){
+},{}],62:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -22421,7 +23643,7 @@ var ReactEventEmitterMixin = {
 
 module.exports = ReactEventEmitterMixin;
 
-},{"./EventPluginHub":21}],60:[function(require,module,exports){
+},{"./EventPluginHub":24}],63:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -22612,7 +23834,7 @@ var ReactEventListener = {
 
 module.exports = ReactEventListener;
 
-},{"./EventListener":20,"./ExecutionEnvironment":25,"./PooledClass":30,"./ReactInstanceHandles":63,"./ReactMount":65,"./ReactUpdates":80,"./getEventTarget":115,"./getUnboundedScrollPosition":120,"./mixInto":137}],61:[function(require,module,exports){
+},{"./EventListener":23,"./ExecutionEnvironment":28,"./PooledClass":33,"./ReactInstanceHandles":66,"./ReactMount":68,"./ReactUpdates":83,"./getEventTarget":118,"./getUnboundedScrollPosition":123,"./mixInto":140}],64:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -22659,7 +23881,7 @@ var ReactInjection = {
 
 module.exports = ReactInjection;
 
-},{"./DOMProperty":14,"./EventPluginHub":21,"./ReactBrowserEventEmitter":33,"./ReactComponent":35,"./ReactCompositeComponent":37,"./ReactDOM":40,"./ReactEmptyComponent":57,"./ReactPerf":69,"./ReactRootIndex":76,"./ReactUpdates":80}],62:[function(require,module,exports){
+},{"./DOMProperty":17,"./EventPluginHub":24,"./ReactBrowserEventEmitter":36,"./ReactComponent":38,"./ReactCompositeComponent":40,"./ReactDOM":43,"./ReactEmptyComponent":60,"./ReactPerf":72,"./ReactRootIndex":79,"./ReactUpdates":83}],65:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -22802,7 +24024,7 @@ var ReactInputSelection = {
 
 module.exports = ReactInputSelection;
 
-},{"./ReactDOMSelection":49,"./containsNode":100,"./focusNode":110,"./getActiveElement":112}],63:[function(require,module,exports){
+},{"./ReactDOMSelection":52,"./containsNode":103,"./focusNode":113,"./getActiveElement":115}],66:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2014 Facebook, Inc.
@@ -23144,7 +24366,7 @@ var ReactInstanceHandles = {
 module.exports = ReactInstanceHandles;
 
 }).call(this,require("+7ZJp0"))
-},{"+7ZJp0":3,"./ReactRootIndex":76,"./invariant":124}],64:[function(require,module,exports){
+},{"+7ZJp0":6,"./ReactRootIndex":79,"./invariant":127}],67:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -23199,7 +24421,7 @@ var ReactMarkupChecksum = {
 
 module.exports = ReactMarkupChecksum;
 
-},{"./adler32":99}],65:[function(require,module,exports){
+},{"./adler32":102}],68:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2014 Facebook, Inc.
@@ -23884,7 +25106,7 @@ var ReactMount = {
 module.exports = ReactMount;
 
 }).call(this,require("+7ZJp0"))
-},{"+7ZJp0":3,"./DOMProperty":14,"./ReactBrowserEventEmitter":33,"./ReactCurrentOwner":39,"./ReactDescriptor":55,"./ReactInstanceHandles":63,"./ReactPerf":69,"./containsNode":100,"./getReactRootElementInContainer":118,"./instantiateReactComponent":123,"./invariant":124,"./shouldUpdateReactComponent":144,"./warning":147}],66:[function(require,module,exports){
+},{"+7ZJp0":6,"./DOMProperty":17,"./ReactBrowserEventEmitter":36,"./ReactCurrentOwner":42,"./ReactDescriptor":58,"./ReactInstanceHandles":66,"./ReactPerf":72,"./containsNode":103,"./getReactRootElementInContainer":121,"./instantiateReactComponent":126,"./invariant":127,"./shouldUpdateReactComponent":147,"./warning":150}],69:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -24316,7 +25538,7 @@ var ReactMultiChild = {
 
 module.exports = ReactMultiChild;
 
-},{"./ReactComponent":35,"./ReactMultiChildUpdateTypes":67,"./flattenChildren":109,"./instantiateReactComponent":123,"./shouldUpdateReactComponent":144}],67:[function(require,module,exports){
+},{"./ReactComponent":38,"./ReactMultiChildUpdateTypes":70,"./flattenChildren":112,"./instantiateReactComponent":126,"./shouldUpdateReactComponent":147}],70:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -24356,7 +25578,7 @@ var ReactMultiChildUpdateTypes = keyMirror({
 
 module.exports = ReactMultiChildUpdateTypes;
 
-},{"./keyMirror":130}],68:[function(require,module,exports){
+},{"./keyMirror":133}],71:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2014 Facebook, Inc.
@@ -24519,7 +25741,7 @@ var ReactOwner = {
 module.exports = ReactOwner;
 
 }).call(this,require("+7ZJp0"))
-},{"+7ZJp0":3,"./emptyObject":107,"./invariant":124}],69:[function(require,module,exports){
+},{"+7ZJp0":6,"./emptyObject":110,"./invariant":127}],72:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2014 Facebook, Inc.
@@ -24608,7 +25830,7 @@ function _noMeasure(objName, fnName, func) {
 module.exports = ReactPerf;
 
 }).call(this,require("+7ZJp0"))
-},{"+7ZJp0":3}],70:[function(require,module,exports){
+},{"+7ZJp0":6}],73:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2014 Facebook, Inc.
@@ -24774,7 +25996,7 @@ var ReactPropTransferer = {
 module.exports = ReactPropTransferer;
 
 }).call(this,require("+7ZJp0"))
-},{"+7ZJp0":3,"./emptyFunction":106,"./invariant":124,"./joinClasses":129,"./merge":134}],71:[function(require,module,exports){
+},{"+7ZJp0":6,"./emptyFunction":109,"./invariant":127,"./joinClasses":132,"./merge":137}],74:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2014 Facebook, Inc.
@@ -24809,7 +26031,7 @@ if ("production" !== process.env.NODE_ENV) {
 module.exports = ReactPropTypeLocationNames;
 
 }).call(this,require("+7ZJp0"))
-},{"+7ZJp0":3}],72:[function(require,module,exports){
+},{"+7ZJp0":6}],75:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -24840,7 +26062,7 @@ var ReactPropTypeLocations = keyMirror({
 
 module.exports = ReactPropTypeLocations;
 
-},{"./keyMirror":130}],73:[function(require,module,exports){
+},{"./keyMirror":133}],76:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -25185,7 +26407,7 @@ function getPreciseType(propValue) {
 
 module.exports = ReactPropTypes;
 
-},{"./ReactDescriptor":55,"./ReactPropTypeLocationNames":71,"./emptyFunction":106}],74:[function(require,module,exports){
+},{"./ReactDescriptor":58,"./ReactPropTypeLocationNames":74,"./emptyFunction":109}],77:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -25248,7 +26470,7 @@ PooledClass.addPoolingTo(ReactPutListenerQueue);
 
 module.exports = ReactPutListenerQueue;
 
-},{"./PooledClass":30,"./ReactBrowserEventEmitter":33,"./mixInto":137}],75:[function(require,module,exports){
+},{"./PooledClass":33,"./ReactBrowserEventEmitter":36,"./mixInto":140}],78:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -25432,7 +26654,7 @@ PooledClass.addPoolingTo(ReactReconcileTransaction);
 
 module.exports = ReactReconcileTransaction;
 
-},{"./CallbackQueue":9,"./PooledClass":30,"./ReactBrowserEventEmitter":33,"./ReactInputSelection":62,"./ReactPutListenerQueue":74,"./Transaction":96,"./mixInto":137}],76:[function(require,module,exports){
+},{"./CallbackQueue":12,"./PooledClass":33,"./ReactBrowserEventEmitter":36,"./ReactInputSelection":65,"./ReactPutListenerQueue":77,"./Transaction":99,"./mixInto":140}],79:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -25470,7 +26692,7 @@ var ReactRootIndex = {
 
 module.exports = ReactRootIndex;
 
-},{}],77:[function(require,module,exports){
+},{}],80:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2014 Facebook, Inc.
@@ -25563,7 +26785,7 @@ module.exports = {
 };
 
 }).call(this,require("+7ZJp0"))
-},{"+7ZJp0":3,"./ReactDescriptor":55,"./ReactInstanceHandles":63,"./ReactMarkupChecksum":64,"./ReactServerRenderingTransaction":78,"./instantiateReactComponent":123,"./invariant":124}],78:[function(require,module,exports){
+},{"+7ZJp0":6,"./ReactDescriptor":58,"./ReactInstanceHandles":66,"./ReactMarkupChecksum":67,"./ReactServerRenderingTransaction":81,"./instantiateReactComponent":126,"./invariant":127}],81:[function(require,module,exports){
 /**
  * Copyright 2014 Facebook, Inc.
  *
@@ -25680,7 +26902,7 @@ PooledClass.addPoolingTo(ReactServerRenderingTransaction);
 
 module.exports = ReactServerRenderingTransaction;
 
-},{"./CallbackQueue":9,"./PooledClass":30,"./ReactPutListenerQueue":74,"./Transaction":96,"./emptyFunction":106,"./mixInto":137}],79:[function(require,module,exports){
+},{"./CallbackQueue":12,"./PooledClass":33,"./ReactPutListenerQueue":77,"./Transaction":99,"./emptyFunction":109,"./mixInto":140}],82:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -25789,7 +27011,7 @@ mixInto(ReactTextComponent, {
 
 module.exports = ReactDescriptor.createFactory(ReactTextComponent);
 
-},{"./DOMPropertyOperations":15,"./ReactBrowserComponentMixin":32,"./ReactComponent":35,"./ReactDescriptor":55,"./escapeTextForBrowser":108,"./mixInto":137}],80:[function(require,module,exports){
+},{"./DOMPropertyOperations":18,"./ReactBrowserComponentMixin":35,"./ReactComponent":38,"./ReactDescriptor":58,"./escapeTextForBrowser":111,"./mixInto":140}],83:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2014 Facebook, Inc.
@@ -26058,7 +27280,7 @@ var ReactUpdates = {
 module.exports = ReactUpdates;
 
 }).call(this,require("+7ZJp0"))
-},{"+7ZJp0":3,"./CallbackQueue":9,"./PooledClass":30,"./ReactCurrentOwner":39,"./ReactPerf":69,"./Transaction":96,"./invariant":124,"./mixInto":137,"./warning":147}],81:[function(require,module,exports){
+},{"+7ZJp0":6,"./CallbackQueue":12,"./PooledClass":33,"./ReactCurrentOwner":42,"./ReactPerf":72,"./Transaction":99,"./invariant":127,"./mixInto":140,"./warning":150}],84:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -26157,7 +27379,7 @@ var SVGDOMPropertyConfig = {
 
 module.exports = SVGDOMPropertyConfig;
 
-},{"./DOMProperty":14}],82:[function(require,module,exports){
+},{"./DOMProperty":17}],85:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -26359,7 +27581,7 @@ var SelectEventPlugin = {
 
 module.exports = SelectEventPlugin;
 
-},{"./EventConstants":19,"./EventPropagators":24,"./ReactInputSelection":62,"./SyntheticEvent":88,"./getActiveElement":112,"./isTextInputElement":127,"./keyOf":131,"./shallowEqual":143}],83:[function(require,module,exports){
+},{"./EventConstants":22,"./EventPropagators":27,"./ReactInputSelection":65,"./SyntheticEvent":91,"./getActiveElement":115,"./isTextInputElement":130,"./keyOf":134,"./shallowEqual":146}],86:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -26397,7 +27619,7 @@ var ServerReactRootIndex = {
 
 module.exports = ServerReactRootIndex;
 
-},{}],84:[function(require,module,exports){
+},{}],87:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2014 Facebook, Inc.
@@ -26820,7 +28042,7 @@ var SimpleEventPlugin = {
 module.exports = SimpleEventPlugin;
 
 }).call(this,require("+7ZJp0"))
-},{"+7ZJp0":3,"./EventConstants":19,"./EventPluginUtils":23,"./EventPropagators":24,"./SyntheticClipboardEvent":85,"./SyntheticDragEvent":87,"./SyntheticEvent":88,"./SyntheticFocusEvent":89,"./SyntheticKeyboardEvent":91,"./SyntheticMouseEvent":92,"./SyntheticTouchEvent":93,"./SyntheticUIEvent":94,"./SyntheticWheelEvent":95,"./invariant":124,"./keyOf":131}],85:[function(require,module,exports){
+},{"+7ZJp0":6,"./EventConstants":22,"./EventPluginUtils":26,"./EventPropagators":27,"./SyntheticClipboardEvent":88,"./SyntheticDragEvent":90,"./SyntheticEvent":91,"./SyntheticFocusEvent":92,"./SyntheticKeyboardEvent":94,"./SyntheticMouseEvent":95,"./SyntheticTouchEvent":96,"./SyntheticUIEvent":97,"./SyntheticWheelEvent":98,"./invariant":127,"./keyOf":134}],88:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -26873,7 +28095,7 @@ SyntheticEvent.augmentClass(SyntheticClipboardEvent, ClipboardEventInterface);
 module.exports = SyntheticClipboardEvent;
 
 
-},{"./SyntheticEvent":88}],86:[function(require,module,exports){
+},{"./SyntheticEvent":91}],89:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -26926,7 +28148,7 @@ SyntheticEvent.augmentClass(
 module.exports = SyntheticCompositionEvent;
 
 
-},{"./SyntheticEvent":88}],87:[function(require,module,exports){
+},{"./SyntheticEvent":91}],90:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -26972,7 +28194,7 @@ SyntheticMouseEvent.augmentClass(SyntheticDragEvent, DragEventInterface);
 
 module.exports = SyntheticDragEvent;
 
-},{"./SyntheticMouseEvent":92}],88:[function(require,module,exports){
+},{"./SyntheticMouseEvent":95}],91:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -27138,7 +28360,7 @@ PooledClass.addPoolingTo(SyntheticEvent, PooledClass.threeArgumentPooler);
 
 module.exports = SyntheticEvent;
 
-},{"./PooledClass":30,"./emptyFunction":106,"./getEventTarget":115,"./merge":134,"./mergeInto":136}],89:[function(require,module,exports){
+},{"./PooledClass":33,"./emptyFunction":109,"./getEventTarget":118,"./merge":137,"./mergeInto":139}],92:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -27184,7 +28406,7 @@ SyntheticUIEvent.augmentClass(SyntheticFocusEvent, FocusEventInterface);
 
 module.exports = SyntheticFocusEvent;
 
-},{"./SyntheticUIEvent":94}],90:[function(require,module,exports){
+},{"./SyntheticUIEvent":97}],93:[function(require,module,exports){
 /**
  * Copyright 2013 Facebook, Inc.
  *
@@ -27238,7 +28460,7 @@ SyntheticEvent.augmentClass(
 module.exports = SyntheticInputEvent;
 
 
-},{"./SyntheticEvent":88}],91:[function(require,module,exports){
+},{"./SyntheticEvent":91}],94:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -27327,7 +28549,7 @@ SyntheticUIEvent.augmentClass(SyntheticKeyboardEvent, KeyboardEventInterface);
 
 module.exports = SyntheticKeyboardEvent;
 
-},{"./SyntheticUIEvent":94,"./getEventKey":113,"./getEventModifierState":114}],92:[function(require,module,exports){
+},{"./SyntheticUIEvent":97,"./getEventKey":116,"./getEventModifierState":117}],95:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -27417,7 +28639,7 @@ SyntheticUIEvent.augmentClass(SyntheticMouseEvent, MouseEventInterface);
 
 module.exports = SyntheticMouseEvent;
 
-},{"./SyntheticUIEvent":94,"./ViewportMetrics":97,"./getEventModifierState":114}],93:[function(require,module,exports){
+},{"./SyntheticUIEvent":97,"./ViewportMetrics":100,"./getEventModifierState":117}],96:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -27472,7 +28694,7 @@ SyntheticUIEvent.augmentClass(SyntheticTouchEvent, TouchEventInterface);
 
 module.exports = SyntheticTouchEvent;
 
-},{"./SyntheticUIEvent":94,"./getEventModifierState":114}],94:[function(require,module,exports){
+},{"./SyntheticUIEvent":97,"./getEventModifierState":117}],97:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -27541,7 +28763,7 @@ SyntheticEvent.augmentClass(SyntheticUIEvent, UIEventInterface);
 
 module.exports = SyntheticUIEvent;
 
-},{"./SyntheticEvent":88,"./getEventTarget":115}],95:[function(require,module,exports){
+},{"./SyntheticEvent":91,"./getEventTarget":118}],98:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -27609,7 +28831,7 @@ SyntheticMouseEvent.augmentClass(SyntheticWheelEvent, WheelEventInterface);
 
 module.exports = SyntheticWheelEvent;
 
-},{"./SyntheticMouseEvent":92}],96:[function(require,module,exports){
+},{"./SyntheticMouseEvent":95}],99:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2014 Facebook, Inc.
@@ -27857,7 +29079,7 @@ var Transaction = {
 module.exports = Transaction;
 
 }).call(this,require("+7ZJp0"))
-},{"+7ZJp0":3,"./invariant":124}],97:[function(require,module,exports){
+},{"+7ZJp0":6,"./invariant":127}],100:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -27896,7 +29118,7 @@ var ViewportMetrics = {
 
 module.exports = ViewportMetrics;
 
-},{"./getUnboundedScrollPosition":120}],98:[function(require,module,exports){
+},{"./getUnboundedScrollPosition":123}],101:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2014 Facebook, Inc.
@@ -27954,7 +29176,7 @@ function accumulate(current, next) {
 module.exports = accumulate;
 
 }).call(this,require("+7ZJp0"))
-},{"+7ZJp0":3,"./invariant":124}],99:[function(require,module,exports){
+},{"+7ZJp0":6,"./invariant":127}],102:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -27995,7 +29217,7 @@ function adler32(data) {
 
 module.exports = adler32;
 
-},{}],100:[function(require,module,exports){
+},{}],103:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -28046,7 +29268,7 @@ function containsNode(outerNode, innerNode) {
 
 module.exports = containsNode;
 
-},{"./isTextNode":128}],101:[function(require,module,exports){
+},{"./isTextNode":131}],104:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2014 Facebook, Inc.
@@ -28104,7 +29326,7 @@ function copyProperties(obj, a, b, c, d, e, f) {
 module.exports = copyProperties;
 
 }).call(this,require("+7ZJp0"))
-},{"+7ZJp0":3}],102:[function(require,module,exports){
+},{"+7ZJp0":6}],105:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -28197,7 +29419,7 @@ function createArrayFrom(obj) {
 
 module.exports = createArrayFrom;
 
-},{"./toArray":145}],103:[function(require,module,exports){
+},{"./toArray":148}],106:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2014 Facebook, Inc.
@@ -28264,7 +29486,7 @@ function createFullPageComponent(componentClass) {
 module.exports = createFullPageComponent;
 
 }).call(this,require("+7ZJp0"))
-},{"+7ZJp0":3,"./ReactCompositeComponent":37,"./invariant":124}],104:[function(require,module,exports){
+},{"+7ZJp0":6,"./ReactCompositeComponent":40,"./invariant":127}],107:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2014 Facebook, Inc.
@@ -28361,7 +29583,7 @@ function createNodesFromMarkup(markup, handleScript) {
 module.exports = createNodesFromMarkup;
 
 }).call(this,require("+7ZJp0"))
-},{"+7ZJp0":3,"./ExecutionEnvironment":25,"./createArrayFrom":102,"./getMarkupWrap":116,"./invariant":124}],105:[function(require,module,exports){
+},{"+7ZJp0":6,"./ExecutionEnvironment":28,"./createArrayFrom":105,"./getMarkupWrap":119,"./invariant":127}],108:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -28426,7 +29648,7 @@ function dangerousStyleValue(name, value) {
 
 module.exports = dangerousStyleValue;
 
-},{"./CSSProperty":7}],106:[function(require,module,exports){
+},{"./CSSProperty":10}],109:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -28471,7 +29693,7 @@ copyProperties(emptyFunction, {
 
 module.exports = emptyFunction;
 
-},{"./copyProperties":101}],107:[function(require,module,exports){
+},{"./copyProperties":104}],110:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2014 Facebook, Inc.
@@ -28502,7 +29724,7 @@ if ("production" !== process.env.NODE_ENV) {
 module.exports = emptyObject;
 
 }).call(this,require("+7ZJp0"))
-},{"+7ZJp0":3}],108:[function(require,module,exports){
+},{"+7ZJp0":6}],111:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -28550,7 +29772,7 @@ function escapeTextForBrowser(text) {
 
 module.exports = escapeTextForBrowser;
 
-},{}],109:[function(require,module,exports){
+},{}],112:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2014 Facebook, Inc.
@@ -28613,7 +29835,7 @@ function flattenChildren(children) {
 module.exports = flattenChildren;
 
 }).call(this,require("+7ZJp0"))
-},{"+7ZJp0":3,"./traverseAllChildren":146,"./warning":147}],110:[function(require,module,exports){
+},{"+7ZJp0":6,"./traverseAllChildren":149,"./warning":150}],113:[function(require,module,exports){
 /**
  * Copyright 2014 Facebook, Inc.
  *
@@ -28648,7 +29870,7 @@ function focusNode(node) {
 
 module.exports = focusNode;
 
-},{}],111:[function(require,module,exports){
+},{}],114:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -28686,7 +29908,7 @@ var forEachAccumulated = function(arr, cb, scope) {
 
 module.exports = forEachAccumulated;
 
-},{}],112:[function(require,module,exports){
+},{}],115:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -28722,7 +29944,7 @@ function getActiveElement() /*?DOMElement*/ {
 
 module.exports = getActiveElement;
 
-},{}],113:[function(require,module,exports){
+},{}],116:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2014 Facebook, Inc.
@@ -28841,7 +30063,7 @@ function getEventKey(nativeEvent) {
 module.exports = getEventKey;
 
 }).call(this,require("+7ZJp0"))
-},{"+7ZJp0":3,"./invariant":124}],114:[function(require,module,exports){
+},{"+7ZJp0":6,"./invariant":127}],117:[function(require,module,exports){
 /**
  * Copyright 2013 Facebook, Inc.
  *
@@ -28895,7 +30117,7 @@ function getEventModifierState(nativeEvent) {
 
 module.exports = getEventModifierState;
 
-},{}],115:[function(require,module,exports){
+},{}],118:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -28933,7 +30155,7 @@ function getEventTarget(nativeEvent) {
 
 module.exports = getEventTarget;
 
-},{}],116:[function(require,module,exports){
+},{}],119:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2014 Facebook, Inc.
@@ -29057,7 +30279,7 @@ function getMarkupWrap(nodeName) {
 module.exports = getMarkupWrap;
 
 }).call(this,require("+7ZJp0"))
-},{"+7ZJp0":3,"./ExecutionEnvironment":25,"./invariant":124}],117:[function(require,module,exports){
+},{"+7ZJp0":6,"./ExecutionEnvironment":28,"./invariant":127}],120:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -29139,7 +30361,7 @@ function getNodeForCharacterOffset(root, offset) {
 
 module.exports = getNodeForCharacterOffset;
 
-},{}],118:[function(require,module,exports){
+},{}],121:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -29181,7 +30403,7 @@ function getReactRootElementInContainer(container) {
 
 module.exports = getReactRootElementInContainer;
 
-},{}],119:[function(require,module,exports){
+},{}],122:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -29225,7 +30447,7 @@ function getTextContentAccessor() {
 
 module.exports = getTextContentAccessor;
 
-},{"./ExecutionEnvironment":25}],120:[function(require,module,exports){
+},{"./ExecutionEnvironment":28}],123:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -29272,7 +30494,7 @@ function getUnboundedScrollPosition(scrollable) {
 
 module.exports = getUnboundedScrollPosition;
 
-},{}],121:[function(require,module,exports){
+},{}],124:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -29312,7 +30534,7 @@ function hyphenate(string) {
 
 module.exports = hyphenate;
 
-},{}],122:[function(require,module,exports){
+},{}],125:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -29360,7 +30582,7 @@ function hyphenateStyleName(string) {
 
 module.exports = hyphenateStyleName;
 
-},{"./hyphenate":121}],123:[function(require,module,exports){
+},{"./hyphenate":124}],126:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2014 Facebook, Inc.
@@ -29426,7 +30648,7 @@ function instantiateReactComponent(descriptor) {
 module.exports = instantiateReactComponent;
 
 }).call(this,require("+7ZJp0"))
-},{"+7ZJp0":3,"./invariant":124}],124:[function(require,module,exports){
+},{"+7ZJp0":6,"./invariant":127}],127:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2014 Facebook, Inc.
@@ -29490,7 +30712,7 @@ var invariant = function(condition, format, a, b, c, d, e, f) {
 module.exports = invariant;
 
 }).call(this,require("+7ZJp0"))
-},{"+7ZJp0":3}],125:[function(require,module,exports){
+},{"+7ZJp0":6}],128:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -29562,7 +30784,7 @@ function isEventSupported(eventNameSuffix, capture) {
 
 module.exports = isEventSupported;
 
-},{"./ExecutionEnvironment":25}],126:[function(require,module,exports){
+},{"./ExecutionEnvironment":28}],129:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -29597,7 +30819,7 @@ function isNode(object) {
 
 module.exports = isNode;
 
-},{}],127:[function(require,module,exports){
+},{}],130:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -29648,7 +30870,7 @@ function isTextInputElement(elem) {
 
 module.exports = isTextInputElement;
 
-},{}],128:[function(require,module,exports){
+},{}],131:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -29680,7 +30902,7 @@ function isTextNode(object) {
 
 module.exports = isTextNode;
 
-},{"./isNode":126}],129:[function(require,module,exports){
+},{"./isNode":129}],132:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -29726,7 +30948,7 @@ function joinClasses(className/*, ... */) {
 
 module.exports = joinClasses;
 
-},{}],130:[function(require,module,exports){
+},{}],133:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2014 Facebook, Inc.
@@ -29788,7 +31010,7 @@ var keyMirror = function(obj) {
 module.exports = keyMirror;
 
 }).call(this,require("+7ZJp0"))
-},{"+7ZJp0":3,"./invariant":124}],131:[function(require,module,exports){
+},{"+7ZJp0":6,"./invariant":127}],134:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -29831,7 +31053,7 @@ var keyOf = function(oneKeyObj) {
 
 module.exports = keyOf;
 
-},{}],132:[function(require,module,exports){
+},{}],135:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -29885,7 +31107,7 @@ function mapObject(obj, func, context) {
 
 module.exports = mapObject;
 
-},{}],133:[function(require,module,exports){
+},{}],136:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -29926,7 +31148,7 @@ function memoizeStringOnly(callback) {
 
 module.exports = memoizeStringOnly;
 
-},{}],134:[function(require,module,exports){
+},{}],137:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -29965,7 +31187,7 @@ var merge = function(one, two) {
 
 module.exports = merge;
 
-},{"./mergeInto":136}],135:[function(require,module,exports){
+},{"./mergeInto":139}],138:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2014 Facebook, Inc.
@@ -30116,7 +31338,7 @@ var mergeHelpers = {
 module.exports = mergeHelpers;
 
 }).call(this,require("+7ZJp0"))
-},{"+7ZJp0":3,"./invariant":124,"./keyMirror":130}],136:[function(require,module,exports){
+},{"+7ZJp0":6,"./invariant":127,"./keyMirror":133}],139:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -30164,7 +31386,7 @@ function mergeInto(one, two) {
 
 module.exports = mergeInto;
 
-},{"./mergeHelpers":135}],137:[function(require,module,exports){
+},{"./mergeHelpers":138}],140:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -30200,7 +31422,7 @@ var mixInto = function(constructor, methodBag) {
 
 module.exports = mixInto;
 
-},{}],138:[function(require,module,exports){
+},{}],141:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2014 Facebook, Inc.
@@ -30241,7 +31463,7 @@ function monitorCodeUse(eventName, data) {
 module.exports = monitorCodeUse;
 
 }).call(this,require("+7ZJp0"))
-},{"+7ZJp0":3,"./invariant":124}],139:[function(require,module,exports){
+},{"+7ZJp0":6,"./invariant":127}],142:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2014 Facebook, Inc.
@@ -30288,7 +31510,7 @@ function onlyChild(children) {
 module.exports = onlyChild;
 
 }).call(this,require("+7ZJp0"))
-},{"+7ZJp0":3,"./ReactDescriptor":55,"./invariant":124}],140:[function(require,module,exports){
+},{"+7ZJp0":6,"./ReactDescriptor":58,"./invariant":127}],143:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -30323,7 +31545,7 @@ if (ExecutionEnvironment.canUseDOM) {
 
 module.exports = performance || {};
 
-},{"./ExecutionEnvironment":25}],141:[function(require,module,exports){
+},{"./ExecutionEnvironment":28}],144:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -30358,7 +31580,7 @@ var performanceNow = performance.now.bind(performance);
 
 module.exports = performanceNow;
 
-},{"./performance":140}],142:[function(require,module,exports){
+},{"./performance":143}],145:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -30445,7 +31667,7 @@ if (ExecutionEnvironment.canUseDOM) {
 
 module.exports = setInnerHTML;
 
-},{"./ExecutionEnvironment":25}],143:[function(require,module,exports){
+},{"./ExecutionEnvironment":28}],146:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -30496,7 +31718,7 @@ function shallowEqual(objA, objB) {
 
 module.exports = shallowEqual;
 
-},{}],144:[function(require,module,exports){
+},{}],147:[function(require,module,exports){
 /**
  * Copyright 2013-2014 Facebook, Inc.
  *
@@ -30542,7 +31764,7 @@ function shouldUpdateReactComponent(prevDescriptor, nextDescriptor) {
 
 module.exports = shouldUpdateReactComponent;
 
-},{}],145:[function(require,module,exports){
+},{}],148:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2014 Facebook, Inc.
@@ -30621,7 +31843,7 @@ function toArray(obj) {
 module.exports = toArray;
 
 }).call(this,require("+7ZJp0"))
-},{"+7ZJp0":3,"./invariant":124}],146:[function(require,module,exports){
+},{"+7ZJp0":6,"./invariant":127}],149:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2014 Facebook, Inc.
@@ -30818,7 +32040,7 @@ function traverseAllChildren(children, callback, traverseContext) {
 module.exports = traverseAllChildren;
 
 }).call(this,require("+7ZJp0"))
-},{"+7ZJp0":3,"./ReactInstanceHandles":63,"./ReactTextComponent":79,"./invariant":124}],147:[function(require,module,exports){
+},{"+7ZJp0":6,"./ReactInstanceHandles":66,"./ReactTextComponent":82,"./invariant":127}],150:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2014 Facebook, Inc.
@@ -30870,14 +32092,14 @@ if ("production" !== process.env.NODE_ENV) {
 module.exports = warning;
 
 }).call(this,require("+7ZJp0"))
-},{"+7ZJp0":3,"./emptyFunction":106}],148:[function(require,module,exports){
+},{"+7ZJp0":6,"./emptyFunction":109}],151:[function(require,module,exports){
 module.exports = require('./lib/React');
 
-},{"./lib/React":31}],149:[function(require,module,exports){
+},{"./lib/React":34}],152:[function(require,module,exports){
 
 module.exports = require('./lib/');
 
-},{"./lib/":150}],150:[function(require,module,exports){
+},{"./lib/":153}],153:[function(require,module,exports){
 
 /**
  * Module dependencies.
@@ -30966,7 +32188,7 @@ exports.connect = lookup;
 exports.Manager = require('./manager');
 exports.Socket = require('./socket');
 
-},{"./manager":151,"./socket":153,"./url":154,"debug":157,"socket.io-parser":188}],151:[function(require,module,exports){
+},{"./manager":154,"./socket":156,"./url":157,"debug":160,"socket.io-parser":190}],154:[function(require,module,exports){
 
 /**
  * Module dependencies.
@@ -30981,7 +32203,6 @@ var on = require('./on');
 var bind = require('component-bind');
 var object = require('object-component');
 var debug = require('debug')('socket.io-client:manager');
-var indexOf = require('indexof');
 
 /**
  * Module exports
@@ -31016,14 +32237,13 @@ function Manager(uri, opts){
   this.timeout(null == opts.timeout ? 20000 : opts.timeout);
   this.readyState = 'closed';
   this.uri = uri;
-  this.connected = [];
+  this.connected = 0;
   this.attempts = 0;
   this.encoding = false;
   this.packetBuffer = [];
   this.encoder = new parser.Encoder();
   this.decoder = new parser.Decoder();
-  this.autoConnect = opts.autoConnect !== false;
-  if (this.autoConnect) this.open();
+  this.open();
 }
 
 /**
@@ -31122,8 +32342,7 @@ Manager.prototype.timeout = function(v){
  */
 
 Manager.prototype.maybeReconnectOnOpen = function() {
-  // Only try to reconnect if it's the first time we're connecting
-  if (!this.openReconnect && !this.reconnecting && this._reconnection && this.attempts === 0) {
+  if (!this.openReconnect && !this.reconnecting && this._reconnection) {
     // keeps reconnection from firing twice for the same reconnection loop
     this.openReconnect = true;
     this.reconnect();
@@ -31149,7 +32368,6 @@ Manager.prototype.connect = function(fn){
   var socket = this.engine;
   var self = this;
   this.readyState = 'opening';
-  this.skipReconnect = false;
 
   // emit `open`
   var openSub = on(socket, 'open', function() {
@@ -31268,9 +32486,7 @@ Manager.prototype.socket = function(nsp){
     this.nsps[nsp] = socket;
     var self = this;
     socket.on('connect', function(){
-      if (!~indexOf(self.connected, socket)) {
-        self.connected.push(socket);
-      }
+      self.connected++;
     });
   }
   return socket;
@@ -31283,11 +32499,7 @@ Manager.prototype.socket = function(nsp){
  */
 
 Manager.prototype.destroy = function(socket){
-  var index = indexOf(this.connected, socket);
-  if (~index) this.connected.splice(index, 1);
-  if (this.connected.length) return;
-
-  this.close();
+  --this.connected || this.close();
 };
 
 /**
@@ -31355,8 +32567,7 @@ Manager.prototype.cleanup = function(){
 Manager.prototype.close =
 Manager.prototype.disconnect = function(){
   this.skipReconnect = true;
-  this.readyState = 'closed';
-  this.engine && this.engine.close();
+  this.engine.close();
 };
 
 /**
@@ -31382,7 +32593,7 @@ Manager.prototype.onclose = function(reason){
  */
 
 Manager.prototype.reconnect = function(){
-  if (this.reconnecting || this.skipReconnect) return this;
+  if (this.reconnecting) return this;
 
   var self = this;
   this.attempts++;
@@ -31398,15 +32609,9 @@ Manager.prototype.reconnect = function(){
 
     this.reconnecting = true;
     var timer = setTimeout(function(){
-      if (self.skipReconnect) return;
-
       debug('attempting reconnect');
       self.emitAll('reconnect_attempt', self.attempts);
       self.emitAll('reconnecting', self.attempts);
-
-      // check again for the case socket closed in above events
-      if (self.skipReconnect) return;
-
       self.open(function(err){
         if (err) {
           debug('reconnect attempt error');
@@ -31441,7 +32646,7 @@ Manager.prototype.onreconnect = function(){
   this.emitAll('reconnect', attempt);
 };
 
-},{"./on":152,"./socket":153,"./url":154,"component-bind":155,"component-emitter":156,"debug":157,"engine.io-client":158,"indexof":184,"object-component":185,"socket.io-parser":188}],152:[function(require,module,exports){
+},{"./on":155,"./socket":156,"./url":157,"component-bind":158,"component-emitter":159,"debug":160,"engine.io-client":161,"object-component":187,"socket.io-parser":190}],155:[function(require,module,exports){
 
 /**
  * Module exports.
@@ -31467,7 +32672,7 @@ function on(obj, ev, fn) {
   };
 }
 
-},{}],153:[function(require,module,exports){
+},{}],156:[function(require,module,exports){
 
 /**
  * Module dependencies.
@@ -31479,7 +32684,8 @@ var toArray = require('to-array');
 var on = require('./on');
 var bind = require('component-bind');
 var debug = require('debug')('socket.io-client:socket');
-var hasBin = require('has-binary');
+var hasBin = require('has-binary-data');
+var indexOf = require('indexof');
 
 /**
  * Module exports.
@@ -31525,11 +32731,12 @@ function Socket(io, nsp){
   this.json = this; // compat
   this.ids = 0;
   this.acks = {};
-  if (this.io.autoConnect) this.open();
+  this.open();
   this.receiveBuffer = [];
   this.sendBuffer = [];
   this.connected = false;
   this.disconnected = true;
+  this.subEvents();
 }
 
 /**
@@ -31545,8 +32752,6 @@ Emitter(Socket.prototype);
  */
 
 Socket.prototype.subEvents = function() {
-  if (this.subs) return;
-
   var io = this.io;
   this.subs = [
     on(io, 'open', bind(this, 'onopen')),
@@ -31556,16 +32761,15 @@ Socket.prototype.subEvents = function() {
 };
 
 /**
- * "Opens" the socket.
+ * Called upon engine `open`.
  *
- * @api public
+ * @api private
  */
 
 Socket.prototype.open =
 Socket.prototype.connect = function(){
   if (this.connected) return this;
 
-  this.subEvents();
   this.io.open(); // ensure open
   if ('open' == this.io.readyState) this.onopen();
   return this;
@@ -31634,7 +32838,7 @@ Socket.prototype.packet = function(packet){
 };
 
 /**
- * Called upon engine `open`.
+ * "Opens" the socket.
  *
  * @api private
  */
@@ -31818,12 +33022,9 @@ Socket.prototype.ondisconnect = function(){
  */
 
 Socket.prototype.destroy = function(){
-  if (this.subs) {
-    // clean subscriptions to avoid reconnections
-    for (var i = 0; i < this.subs.length; i++) {
-      this.subs[i].destroy();
-    }
-    this.subs = null;
+  // clean subscriptions to avoid reconnections
+  for (var i = 0; i < this.subs.length; i++) {
+    this.subs[i].destroy();
   }
 
   this.io.destroy(this);
@@ -31838,22 +33039,20 @@ Socket.prototype.destroy = function(){
 
 Socket.prototype.close =
 Socket.prototype.disconnect = function(){
-  if (this.connected) {
-    debug('performing disconnect (%s)', this.nsp);
-    this.packet({ type: parser.DISCONNECT });
-  }
+  if (!this.connected) return this;
+
+  debug('performing disconnect (%s)', this.nsp);
+  this.packet({ type: parser.DISCONNECT });
 
   // remove socket from pool
   this.destroy();
 
-  if (this.connected) {
-    // fire events
-    this.onclose('io client disconnect');
-  }
+  // fire events
+  this.onclose('io client disconnect');
   return this;
 };
 
-},{"./on":152,"component-bind":155,"component-emitter":156,"debug":157,"has-binary":182,"socket.io-parser":188,"to-array":192}],154:[function(require,module,exports){
+},{"./on":155,"component-bind":158,"component-emitter":159,"debug":160,"has-binary-data":184,"indexof":186,"socket.io-parser":190,"to-array":194}],157:[function(require,module,exports){
 (function (global){
 
 /**
@@ -31888,9 +33087,7 @@ function url(uri, loc){
   // relative path support
   if ('string' == typeof uri) {
     if ('/' == uri.charAt(0)) {
-      if ('/' == uri.charAt(1)) {
-        uri = loc.protocol + uri;
-      } else {
+      if ('undefined' != typeof loc) {
         uri = loc.hostname + uri;
       }
     }
@@ -31930,7 +33127,7 @@ function url(uri, loc){
 }
 
 }).call(this,typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"debug":157,"parseuri":186}],155:[function(require,module,exports){
+},{"debug":160,"parseuri":188}],158:[function(require,module,exports){
 /**
  * Slice reference.
  */
@@ -31955,7 +33152,7 @@ module.exports = function(obj, fn){
   }
 };
 
-},{}],156:[function(require,module,exports){
+},{}],159:[function(require,module,exports){
 
 /**
  * Expose `Emitter`.
@@ -32121,7 +33318,7 @@ Emitter.prototype.hasListeners = function(event){
   return !! this.listeners(event).length;
 };
 
-},{}],157:[function(require,module,exports){
+},{}],160:[function(require,module,exports){
 
 /**
  * Expose `debug()` as the module.
@@ -32260,11 +33457,11 @@ try {
   if (window.localStorage) debug.enable(localStorage.debug);
 } catch(e){}
 
-},{}],158:[function(require,module,exports){
+},{}],161:[function(require,module,exports){
 
 module.exports =  require('./lib/');
 
-},{"./lib/":159}],159:[function(require,module,exports){
+},{"./lib/":162}],162:[function(require,module,exports){
 
 module.exports = require('./socket');
 
@@ -32276,7 +33473,7 @@ module.exports = require('./socket');
  */
 module.exports.parser = require('engine.io-parser');
 
-},{"./socket":160,"engine.io-parser":169}],160:[function(require,module,exports){
+},{"./socket":163,"engine.io-parser":172}],163:[function(require,module,exports){
 (function (global){
 /**
  * Module dependencies.
@@ -32351,9 +33548,7 @@ function Socket(uri, opts){
   this.upgrade = false !== opts.upgrade;
   this.path = (opts.path || '/engine.io').replace(/\/$/, '') + '/';
   this.forceJSONP = !!opts.forceJSONP;
-  this.jsonp = false !== opts.jsonp;
   this.forceBase64 = !!opts.forceBase64;
-  this.enablesXDR = !!opts.enablesXDR;
   this.timestampParam = opts.timestampParam || 't';
   this.timestampRequests = opts.timestampRequests;
   this.transports = opts.transports || ['polling', 'websocket'];
@@ -32422,9 +33617,7 @@ Socket.prototype.createTransport = function (name) {
     path: this.path,
     query: query,
     forceJSONP: this.forceJSONP,
-    jsonp: this.jsonp,
     forceBase64: this.forceBase64,
-    enablesXDR: this.enablesXDR,
     timestampRequests: this.timestampRequests,
     timestampParam: this.timestampParam,
     policyPort: this.policyPort,
@@ -32453,28 +33646,11 @@ Socket.prototype.open = function () {
   var transport;
   if (this.rememberUpgrade && Socket.priorWebsocketSuccess && this.transports.indexOf('websocket') != -1) {
     transport = 'websocket';
-  } else if (0 == this.transports.length) {
-    // Emit error on next tick so it can be listened to
-    var self = this;
-    setTimeout(function() {
-      self.emit('error', 'No transports available');
-    }, 0);
-    return;
   } else {
     transport = this.transports[0];
   }
   this.readyState = 'opening';
-
-  // Retry with the next transport if the transport is disabled (jsonp: false)
-  var transport;
-  try {
-    transport = this.createTransport(transport);
-  } catch (e) {
-    this.transports.shift();
-    this.open();
-    return;
-  }
-
+  var transport = this.createTransport(transport);
   transport.open();
   this.setTransport(transport);
 };
@@ -32543,13 +33719,14 @@ Socket.prototype.probe = function (name) {
         debug('probe transport "%s" pong', name);
         self.upgrading = true;
         self.emit('upgrading', transport);
-        if (!transport) return;
         Socket.priorWebsocketSuccess = 'websocket' == transport.name;
 
         debug('pausing current transport "%s"', self.transport.name);
         self.transport.pause(function () {
           if (failed) return;
-          if ('closed' == self.readyState) return;
+          if ('closed' == self.readyState || 'closing' == self.readyState) {
+            return;
+          }
           debug('changing transport and sending upgrade packet');
 
           cleanup();
@@ -32831,10 +34008,6 @@ Socket.prototype.send = function (msg, fn) {
  */
 
 Socket.prototype.sendPacket = function (type, data, fn) {
-  if ('closing' == this.readyState || 'closed' == this.readyState) {
-    return;
-  }
-
   var packet = { type: type, data: data };
   this.emit('packetCreate', packet);
   this.writeBuffer.push(packet);
@@ -32850,41 +34023,9 @@ Socket.prototype.sendPacket = function (type, data, fn) {
 
 Socket.prototype.close = function () {
   if ('opening' == this.readyState || 'open' == this.readyState) {
-    this.readyState = 'closing';
-
-    var self = this;
-
-    function close() {
-      self.onClose('forced close');
-      debug('socket closing - telling transport to close');
-      self.transport.close();
-    }
-
-    function cleanupAndClose() {
-      self.removeListener('upgrade', cleanupAndClose);
-      self.removeListener('upgradeError', cleanupAndClose);
-      close();
-    }
-
-    function waitForUpgrade() {
-      // wait for upgrade to finish since we can't send packets while pausing a transport
-      self.once('upgrade', cleanupAndClose);
-      self.once('upgradeError', cleanupAndClose);
-    }
-
-    if (this.writeBuffer.length) {
-      this.once('drain', function() {
-        if (this.upgrading) {
-          waitForUpgrade();
-        } else {
-          close();
-        }
-      });
-    } else if (this.upgrading) {
-      waitForUpgrade();
-    } else {
-      close();
-    }
+    this.onClose('forced close');
+    debug('socket closing - telling transport to close');
+    this.transport.close();
   }
 
   return this;
@@ -32910,7 +34051,7 @@ Socket.prototype.onError = function (err) {
  */
 
 Socket.prototype.onClose = function (reason, desc) {
-  if ('opening' == this.readyState || 'open' == this.readyState || 'closing' == this.readyState) {
+  if ('opening' == this.readyState || 'open' == this.readyState) {
     debug('socket close with reason: "%s"', reason);
     var self = this;
 
@@ -32963,7 +34104,7 @@ Socket.prototype.filterUpgrades = function (upgrades) {
 };
 
 }).call(this,typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./transport":161,"./transports":162,"component-emitter":156,"debug":157,"engine.io-parser":169,"indexof":184,"parsejson":178,"parseqs":179,"parseuri":180}],161:[function(require,module,exports){
+},{"./transport":164,"./transports":165,"component-emitter":159,"debug":160,"engine.io-parser":172,"indexof":186,"parsejson":181,"parseqs":182,"parseuri":188}],164:[function(require,module,exports){
 /**
  * Module dependencies.
  */
@@ -32995,7 +34136,6 @@ function Transport (opts) {
   this.readyState = '';
   this.agent = opts.agent || false;
   this.socket = opts.socket;
-  this.enablesXDR = opts.enablesXDR;
 }
 
 /**
@@ -33092,8 +34232,13 @@ Transport.prototype.onOpen = function () {
  */
 
 Transport.prototype.onData = function(data){
-  var packet = parser.decodePacket(data, this.socket.binaryType);
-  this.onPacket(packet);
+  try {
+    var packet = parser.decodePacket(data, this.socket.binaryType);
+    this.onPacket(packet);
+  } catch(e){
+    e.data = data;
+    this.onError('parser decode error', e);
+  }
 };
 
 /**
@@ -33115,7 +34260,7 @@ Transport.prototype.onClose = function () {
   this.emit('close');
 };
 
-},{"component-emitter":156,"engine.io-parser":169}],162:[function(require,module,exports){
+},{"component-emitter":159,"engine.io-parser":172}],165:[function(require,module,exports){
 (function (global){
 /**
  * Module dependencies
@@ -33143,8 +34288,6 @@ exports.websocket = websocket;
 function polling(opts){
   var xhr;
   var xd = false;
-  var xs = false;
-  var jsonp = false !== opts.jsonp;
 
   if (global.location) {
     var isSSL = 'https:' == location.protocol;
@@ -33156,23 +34299,20 @@ function polling(opts){
     }
 
     xd = opts.hostname != location.hostname || port != opts.port;
-    xs = opts.secure != isSSL;
   }
 
   opts.xdomain = xd;
-  opts.xscheme = xs;
   xhr = new XMLHttpRequest(opts);
 
   if ('open' in xhr && !opts.forceJSONP) {
     return new XHR(opts);
   } else {
-    if (!jsonp) throw new Error('JSONP disabled');
     return new JSONP(opts);
   }
 }
 
 }).call(this,typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./polling-jsonp":163,"./polling-xhr":164,"./websocket":166,"xmlhttprequest":167}],163:[function(require,module,exports){
+},{"./polling-jsonp":166,"./polling-xhr":167,"./websocket":169,"xmlhttprequest":170}],166:[function(require,module,exports){
 (function (global){
 
 /**
@@ -33280,7 +34420,6 @@ JSONPPolling.prototype.doClose = function () {
   if (this.form) {
     this.form.parentNode.removeChild(this.form);
     this.form = null;
-    this.iframe = null;
   }
 
   Polling.prototype.doClose.call(this);
@@ -33409,7 +34548,7 @@ JSONPPolling.prototype.doWrite = function (data, fn) {
 };
 
 }).call(this,typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./polling":165,"component-inherit":168}],164:[function(require,module,exports){
+},{"./polling":168,"component-inherit":171}],167:[function(require,module,exports){
 (function (global){
 /**
  * Module requirements.
@@ -33455,7 +34594,6 @@ function XHR(opts){
 
     this.xd = opts.hostname != global.location.hostname ||
       port != opts.port;
-    this.xs = opts.secure != isSSL;
   }
 }
 
@@ -33482,10 +34620,8 @@ XHR.prototype.request = function(opts){
   opts = opts || {};
   opts.uri = this.uri();
   opts.xd = this.xd;
-  opts.xs = this.xs;
   opts.agent = this.agent || false;
   opts.supportsBinary = this.supportsBinary;
-  opts.enablesXDR = this.enablesXDR;
   return new Request(opts);
 };
 
@@ -33538,14 +34674,10 @@ function Request(opts){
   this.method = opts.method || 'GET';
   this.uri = opts.uri;
   this.xd = !!opts.xd;
-  this.xs = !!opts.xs;
   this.async = false !== opts.async;
   this.data = undefined != opts.data ? opts.data : null;
   this.agent = opts.agent;
-  this.isBinary = opts.isBinary;
-  this.supportsBinary = opts.supportsBinary;
-  this.enablesXDR = opts.enablesXDR;
-  this.create();
+  this.create(opts.isBinary, opts.supportsBinary);
 }
 
 /**
@@ -33560,14 +34692,14 @@ Emitter(Request.prototype);
  * @api private
  */
 
-Request.prototype.create = function(){
-  var xhr = this.xhr = new XMLHttpRequest({ agent: this.agent, xdomain: this.xd, xscheme: this.xs, enablesXDR: this.enablesXDR });
+Request.prototype.create = function(isBinary, supportsBinary){
+  var xhr = this.xhr = new XMLHttpRequest({ agent: this.agent, xdomain: this.xd });
   var self = this;
 
   try {
     debug('xhr open %s: %s', this.method, this.uri);
     xhr.open(this.method, this.uri, this.async);
-    if (this.supportsBinary) {
+    if (supportsBinary) {
       // This has to be done after open because Firefox is stupid
       // http://stackoverflow.com/questions/13216903/get-binary-data-with-xmlhttprequest-in-a-firefox-extension
       xhr.responseType = 'arraybuffer';
@@ -33575,7 +34707,7 @@ Request.prototype.create = function(){
 
     if ('POST' == this.method) {
       try {
-        if (this.isBinary) {
+        if (isBinary) {
           xhr.setRequestHeader('Content-type', 'application/octet-stream');
         } else {
           xhr.setRequestHeader('Content-type', 'text/plain;charset=UTF-8');
@@ -33588,18 +34720,22 @@ Request.prototype.create = function(){
       xhr.withCredentials = true;
     }
 
-    if (this.hasXDR()) {
-      xhr.onload = function(){
-        self.onLoad();
-      };
-      xhr.onerror = function(){
-        self.onError(xhr.responseText);
-      };
-    } else {
-      xhr.onreadystatechange = function(){
+    xhr.onreadystatechange = function(){
+      var data;
+
+      try {
         if (4 != xhr.readyState) return;
         if (200 == xhr.status || 1223 == xhr.status) {
-          self.onLoad();
+          var contentType = xhr.getResponseHeader('Content-Type');
+          if (contentType === 'application/octet-stream') {
+            data = xhr.response;
+          } else {
+            if (!supportsBinary) {
+              data = xhr.responseText;
+            } else {
+              data = 'ok';
+            }
+          }
         } else {
           // make sure the `error` event handler that's user-set
           // does not throw in the same tick and gets caught here
@@ -33607,8 +34743,14 @@ Request.prototype.create = function(){
             self.onError(xhr.status);
           }, 0);
         }
-      };
-    }
+      } catch (e) {
+        self.onError(e);
+      }
+
+      if (null != data) {
+        self.onData(data);
+      }
+    };
 
     debug('xhr data %s', this.data);
     xhr.send(this.data);
@@ -33672,11 +34814,7 @@ Request.prototype.cleanup = function(){
     return;
   }
   // xmlhttprequest
-  if (this.hasXDR()) {
-    this.xhr.onload = this.xhr.onerror = empty;
-  } else {
-    this.xhr.onreadystatechange = empty;
-  }
+  this.xhr.onreadystatechange = empty;
 
   try {
     this.xhr.abort();
@@ -33687,46 +34825,6 @@ Request.prototype.cleanup = function(){
   }
 
   this.xhr = null;
-};
-
-/**
- * Called upon load.
- *
- * @api private
- */
-
-Request.prototype.onLoad = function(){
-  var data;
-  try {
-    var contentType;
-    try {
-      contentType = this.xhr.getResponseHeader('Content-Type').split(';')[0];
-    } catch (e) {}
-    if (contentType === 'application/octet-stream') {
-      data = this.xhr.response;
-    } else {
-      if (!this.supportsBinary) {
-        data = this.xhr.responseText;
-      } else {
-        data = 'ok';
-      }
-    }
-  } catch (e) {
-    this.onError(e);
-  }
-  if (null != data) {
-    this.onData(data);
-  }
-};
-
-/**
- * Check if it has XDomainRequest.
- *
- * @api private
- */
-
-Request.prototype.hasXDR = function(){
-  return 'undefined' !== typeof global.XDomainRequest && !this.xs && this.enablesXDR;
 };
 
 /**
@@ -33764,7 +34862,7 @@ function unloadHandler() {
 }
 
 }).call(this,typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./polling":165,"component-emitter":156,"component-inherit":168,"debug":157,"xmlhttprequest":167}],165:[function(require,module,exports){
+},{"./polling":168,"component-emitter":159,"component-inherit":171,"debug":160,"xmlhttprequest":170}],168:[function(require,module,exports){
 /**
  * Module dependencies.
  */
@@ -33787,7 +34885,7 @@ module.exports = Polling;
 
 var hasXHR2 = (function() {
   var XMLHttpRequest = require('xmlhttprequest');
-  var xhr = new XMLHttpRequest({ xdomain: false });
+  var xhr = new XMLHttpRequest({ agent: this.agent, xdomain: false });
   return null != xhr.responseType;
 })();
 
@@ -34011,7 +35109,7 @@ Polling.prototype.uri = function(){
   return schema + '://' + this.hostname + port + this.path + query;
 };
 
-},{"../transport":161,"component-inherit":168,"debug":157,"engine.io-parser":169,"parseqs":179,"xmlhttprequest":167}],166:[function(require,module,exports){
+},{"../transport":164,"component-inherit":171,"debug":160,"engine.io-parser":172,"parseqs":182,"xmlhttprequest":170}],169:[function(require,module,exports){
 /**
  * Module dependencies.
  */
@@ -34242,34 +35340,17 @@ WS.prototype.check = function(){
   return !!WebSocket && !('__initialize' in WebSocket && this.name === WS.prototype.name);
 };
 
-},{"../transport":161,"component-inherit":168,"debug":157,"engine.io-parser":169,"parseqs":179,"ws":181}],167:[function(require,module,exports){
+},{"../transport":164,"component-inherit":171,"debug":160,"engine.io-parser":172,"parseqs":182,"ws":183}],170:[function(require,module,exports){
 // browser shim for xmlhttprequest module
 var hasCORS = require('has-cors');
 
 module.exports = function(opts) {
   var xdomain = opts.xdomain;
 
-  // scheme must be same when usign XDomainRequest
-  // http://blogs.msdn.com/b/ieinternals/archive/2010/05/13/xdomainrequest-restrictions-limitations-and-workarounds.aspx
-  var xscheme = opts.xscheme;
-
-  // XDomainRequest has a flow of not sending cookie, therefore it should be disabled as a default.
-  // https://github.com/Automattic/engine.io-client/pull/217
-  var enablesXDR = opts.enablesXDR;
-
   // XMLHttpRequest can be disabled on IE
   try {
     if ('undefined' != typeof XMLHttpRequest && (!xdomain || hasCORS)) {
       return new XMLHttpRequest();
-    }
-  } catch (e) { }
-
-  // Use XDomainRequest for IE8 if enablesXDR is true
-  // because loading bar keeps flashing when using jsonp-polling
-  // https://github.com/yujiosaka/socke.io-ie8-loading-example
-  try {
-    if ('undefined' != typeof XDomainRequest && !xscheme && enablesXDR) {
-      return new XDomainRequest();
     }
   } catch (e) { }
 
@@ -34280,7 +35361,7 @@ module.exports = function(opts) {
   }
 }
 
-},{"has-cors":176}],168:[function(require,module,exports){
+},{"has-cors":179}],171:[function(require,module,exports){
 
 module.exports = function(a, b){
   var fn = function(){};
@@ -34288,7 +35369,7 @@ module.exports = function(a, b){
   a.prototype = new fn;
   a.prototype.constructor = a;
 };
-},{}],169:[function(require,module,exports){
+},{}],172:[function(require,module,exports){
 (function (global){
 /**
  * Module dependencies.
@@ -34313,7 +35394,7 @@ var isAndroid = navigator.userAgent.match(/Android/i);
  * Current protocol version.
  */
 
-exports.protocol = 3;
+exports.protocol = 2;
 
 /**
  * Packet types.
@@ -34359,15 +35440,10 @@ var Blob = require('blob');
  * @api private
  */
 
-exports.encodePacket = function (packet, supportsBinary, utf8encode, callback) {
-  if ('function' == typeof supportsBinary) {
+exports.encodePacket = function (packet, supportsBinary, callback) {
+  if (typeof supportsBinary == 'function') {
     callback = supportsBinary;
     supportsBinary = false;
-  }
-
-  if ('function' == typeof utf8encode) {
-    callback = utf8encode;
-    utf8encode = null;
   }
 
   var data = (packet.data === undefined)
@@ -34385,7 +35461,7 @@ exports.encodePacket = function (packet, supportsBinary, utf8encode, callback) {
 
   // data fragment is optional
   if (undefined !== packet.data) {
-    encoded += utf8encode ? utf8.encode(String(packet.data)) : String(packet.data);
+    encoded += utf8.encode(String(packet.data));
   }
 
   return callback('' + encoded);
@@ -34421,7 +35497,7 @@ function encodeBlobAsArrayBuffer(packet, supportsBinary, callback) {
   var fr = new FileReader();
   fr.onload = function() {
     packet.data = fr.result;
-    exports.encodePacket(packet, supportsBinary, true, callback);
+    exports.encodePacket(packet, supportsBinary, callback);
   };
   return fr.readAsArrayBuffer(packet.data);
 }
@@ -34483,20 +35559,14 @@ exports.encodeBase64Packet = function(packet, callback) {
  * @api private
  */
 
-exports.decodePacket = function (data, binaryType, utf8decode) {
+exports.decodePacket = function (data, binaryType) {
   // String data
   if (typeof data == 'string' || data === undefined) {
     if (data.charAt(0) == 'b') {
       return exports.decodeBase64Packet(data.substr(1), binaryType);
     }
 
-    if (utf8decode) {
-      try {
-        data = utf8.decode(data);
-      } catch (e) {
-        return err;
-      }
-    }
+    data = utf8.decode(data);
     var type = data.charAt(0);
 
     if (Number(type) != type || !packetslist[type]) {
@@ -34580,7 +35650,7 @@ exports.encodePayload = function (packets, supportsBinary, callback) {
   }
 
   function encodeOne(packet, doneCallback) {
-    exports.encodePacket(packet, supportsBinary, true, function(message) {
+    exports.encodePacket(packet, supportsBinary, function(message) {
       doneCallback(null, setLengthHeader(message));
     });
   }
@@ -34656,7 +35726,7 @@ exports.decodePayload = function (data, binaryType, callback) {
       }
 
       if (msg.length) {
-        packet = exports.decodePacket(msg, binaryType, true);
+        packet = exports.decodePacket(msg, binaryType);
 
         if (err.type == packet.type && err.data == packet.data) {
           // parser error in individual packet - ignoring payload
@@ -34700,7 +35770,7 @@ exports.encodePayloadAsArrayBuffer = function(packets, callback) {
   }
 
   function encodeOne(packet, doneCallback) {
-    exports.encodePacket(packet, true, true, function(data) {
+    exports.encodePacket(packet, true, function(data) {
       return doneCallback(null, data);
     });
   }
@@ -34758,7 +35828,7 @@ exports.encodePayloadAsArrayBuffer = function(packets, callback) {
 
 exports.encodePayloadAsBlob = function(packets, callback) {
   function encodeOne(packet, doneCallback) {
-    exports.encodePacket(packet, true, true, function(encoded) {
+    exports.encodePacket(packet, true, function(encoded) {
       var binaryIdentifier = new Uint8Array(1);
       binaryIdentifier[0] = 1;
       if (typeof encoded === 'string') {
@@ -34811,25 +35881,14 @@ exports.decodePayloadAsBinary = function (data, binaryType, callback) {
   var bufferTail = data;
   var buffers = [];
 
-  var numberTooLong = false;
   while (bufferTail.byteLength > 0) {
     var tailArray = new Uint8Array(bufferTail);
     var isString = tailArray[0] === 0;
     var msgLength = '';
-
     for (var i = 1; ; i++) {
       if (tailArray[i] == 255) break;
-
-      if (msgLength.length > 310) {
-        numberTooLong = true;
-        break;
-      }
-
       msgLength += tailArray[i];
     }
-
-    if(numberTooLong) return callback(err, 0, 1);
-
     bufferTail = sliceBuffer(bufferTail, 2 + msgLength.length);
     msgLength = parseInt(msgLength);
 
@@ -34846,19 +35905,18 @@ exports.decodePayloadAsBinary = function (data, binaryType, callback) {
         }
       }
     }
-
     buffers.push(msg);
     bufferTail = sliceBuffer(bufferTail, msgLength);
   }
 
   var total = buffers.length;
   buffers.forEach(function(buffer, i) {
-    callback(exports.decodePacket(buffer, binaryType, true), i, total);
+    callback(exports.decodePacket(buffer, binaryType), i, total);
   });
 };
 
 }).call(this,typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./keys":170,"after":171,"arraybuffer.slice":172,"base64-arraybuffer":173,"blob":174,"utf8":175}],170:[function(require,module,exports){
+},{"./keys":173,"after":174,"arraybuffer.slice":175,"base64-arraybuffer":176,"blob":177,"utf8":178}],173:[function(require,module,exports){
 
 /**
  * Gets the keys for an object.
@@ -34879,7 +35937,7 @@ module.exports = Object.keys || function keys (obj){
   return arr;
 };
 
-},{}],171:[function(require,module,exports){
+},{}],174:[function(require,module,exports){
 module.exports = after
 
 function after(count, callback, err_cb) {
@@ -34909,7 +35967,7 @@ function after(count, callback, err_cb) {
 
 function noop() {}
 
-},{}],172:[function(require,module,exports){
+},{}],175:[function(require,module,exports){
 /**
  * An abstraction for slicing an arraybuffer even when
  * ArrayBuffer.prototype.slice is not supported
@@ -34940,7 +35998,7 @@ module.exports = function(arraybuffer, start, end) {
   return result.buffer;
 };
 
-},{}],173:[function(require,module,exports){
+},{}],176:[function(require,module,exports){
 /*
  * base64-arraybuffer
  * https://github.com/niklasvh/base64-arraybuffer
@@ -35001,7 +36059,7 @@ module.exports = function(arraybuffer, start, end) {
   };
 })("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/");
 
-},{}],174:[function(require,module,exports){
+},{}],177:[function(require,module,exports){
 (function (global){
 /**
  * Create a blob builder even when vendor prefixes exist
@@ -35054,7 +36112,7 @@ module.exports = (function() {
 })();
 
 }).call(this,typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],175:[function(require,module,exports){
+},{}],178:[function(require,module,exports){
 (function (global){
 /*! http://mths.be/utf8js v2.0.0 by @mathias */
 ;(function(root) {
@@ -35297,7 +36355,7 @@ module.exports = (function() {
 }(this));
 
 }).call(this,typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],176:[function(require,module,exports){
+},{}],179:[function(require,module,exports){
 
 /**
  * Module dependencies.
@@ -35322,7 +36380,7 @@ try {
   module.exports = false;
 }
 
-},{"global":177}],177:[function(require,module,exports){
+},{"global":180}],180:[function(require,module,exports){
 
 /**
  * Returns `this`. Execute this without a "context" (i.e. without it being
@@ -35332,7 +36390,7 @@ try {
 
 module.exports = (function () { return this; })();
 
-},{}],178:[function(require,module,exports){
+},{}],181:[function(require,module,exports){
 (function (global){
 /**
  * JSON parse.
@@ -35367,7 +36425,7 @@ module.exports = function parsejson(data) {
   }
 };
 }).call(this,typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],179:[function(require,module,exports){
+},{}],182:[function(require,module,exports){
 /**
  * Compiles a querystring
  * Returns string representation of the object
@@ -35406,48 +36464,7 @@ exports.decode = function(qs){
   return qry;
 };
 
-},{}],180:[function(require,module,exports){
-/**
- * Parses an URI
- *
- * @author Steven Levithan <stevenlevithan.com> (MIT license)
- * @api private
- */
-
-var re = /^(?:(?![^:@]+:[^:@\/]*@)(http|https|ws|wss):\/\/)?((?:(([^:@]*)(?::([^:@]*))?)?@)?((?:[a-f0-9]{0,4}:){2,7}[a-f0-9]{0,4}|[^:\/?#]*)(?::(\d*))?)(((\/(?:[^?#](?![^?#\/]*\.[^?#\/.]+(?:[?#]|$)))*\/?)?([^?#\/]*))(?:\?([^#]*))?(?:#(.*))?)/;
-
-var parts = [
-    'source', 'protocol', 'authority', 'userInfo', 'user', 'password', 'host', 'port', 'relative', 'path', 'directory', 'file', 'query', 'anchor'
-];
-
-module.exports = function parseuri(str) {
-    var src = str,
-        b = str.indexOf('['),
-        e = str.indexOf(']');
-
-    if (b != -1 && e != -1) {
-        str = str.substring(0, b) + str.substring(b, e).replace(/:/g, ';') + str.substring(e, str.length);
-    }
-
-    var m = re.exec(str || ''),
-        uri = {},
-        i = 14;
-
-    while (i--) {
-        uri[parts[i]] = m[i] || '';
-    }
-
-    if (b != -1 && e != -1) {
-        uri.source = src;
-        uri.host = uri.host.substring(1, uri.host.length - 1).replace(/;/g, ':');
-        uri.authority = uri.authority.replace('[', '').replace(']', '').replace(/;/g, ':');
-        uri.ipv6uri = true;
-    }
-
-    return uri;
-};
-
-},{}],181:[function(require,module,exports){
+},{}],183:[function(require,module,exports){
 
 /**
  * Module dependencies.
@@ -35492,9 +36509,8 @@ function ws(uri, protocols, opts) {
 
 if (WebSocket) ws.prototype = WebSocket.prototype;
 
-},{}],182:[function(require,module,exports){
-(function (global){
-
+},{}],184:[function(require,module,exports){
+(function (global,Buffer){
 /*
  * Module requirements.
  */
@@ -35518,10 +36534,10 @@ module.exports = hasBinary;
 
 function hasBinary(data) {
 
-  function _hasBinary(obj) {
+  function recursiveCheckForBinary(obj) { 
     if (!obj) return false;
 
-    if ( (global.Buffer && global.Buffer.isBuffer(obj)) ||
+    if ( (global.Buffer && Buffer.isBuffer(obj)) ||
          (global.ArrayBuffer && obj instanceof ArrayBuffer) ||
          (global.Blob && obj instanceof Blob) ||
          (global.File && obj instanceof File)
@@ -35531,7 +36547,7 @@ function hasBinary(data) {
 
     if (isArray(obj)) {
       for (var i = 0; i < obj.length; i++) {
-          if (_hasBinary(obj[i])) {
+          if (recursiveCheckForBinary(obj[i])) {
               return true;
           }
       }
@@ -35541,7 +36557,7 @@ function hasBinary(data) {
       }
 
       for (var key in obj) {
-        if (obj.hasOwnProperty(key) && _hasBinary(obj[key])) {
+        if (recursiveCheckForBinary(obj[key])) {
           return true;
         }
       }
@@ -35550,16 +36566,16 @@ function hasBinary(data) {
     return false;
   }
 
-  return _hasBinary(data);
+  return recursiveCheckForBinary(data);
 }
 
-}).call(this,typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"isarray":183}],183:[function(require,module,exports){
+}).call(this,typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {},require("buffer").Buffer)
+},{"buffer":3,"isarray":185}],185:[function(require,module,exports){
 module.exports = Array.isArray || function (arr) {
   return Object.prototype.toString.call(arr) == '[object Array]';
 };
 
-},{}],184:[function(require,module,exports){
+},{}],186:[function(require,module,exports){
 
 var indexOf = [].indexOf;
 
@@ -35570,7 +36586,7 @@ module.exports = function(arr, obj){
   }
   return -1;
 };
-},{}],185:[function(require,module,exports){
+},{}],187:[function(require,module,exports){
 
 /**
  * HOP ref.
@@ -35655,7 +36671,7 @@ exports.length = function(obj){
 exports.isEmpty = function(obj){
   return 0 == exports.length(obj);
 };
-},{}],186:[function(require,module,exports){
+},{}],188:[function(require,module,exports){
 /**
  * Parses an URI
  *
@@ -35682,16 +36698,13 @@ module.exports = function parseuri(str) {
   return uri;
 };
 
-},{}],187:[function(require,module,exports){
-(function (global){
-/*global Blob,File*/
-
+},{}],189:[function(require,module,exports){
+(function (global,Buffer){
 /**
- * Module requirements
+ * Modle requirements
  */
 
 var isArray = require('isarray');
-var isBuf = require('./is-buffer');
 
 /**
  * Replaces every Buffer | ArrayBuffer in packet with a numbered placeholder.
@@ -35703,38 +36716,39 @@ var isBuf = require('./is-buffer');
  * @api public
  */
 
-exports.deconstructPacket = function(packet){
-  var buffers = [];
-  var packetData = packet.data;
+exports.deconstructPacket = function(packet) {
+    var buffers = [];
+    var packetData = packet.data;
 
-  function _deconstructPacket(data) {
-    if (!data) return data;
+    function deconstructBinPackRecursive(data) {
+        if (!data) return data;
 
-    if (isBuf(data)) {
-      var placeholder = { _placeholder: true, num: buffers.length };
-      buffers.push(data);
-      return placeholder;
-    } else if (isArray(data)) {
-      var newData = new Array(data.length);
-      for (var i = 0; i < data.length; i++) {
-        newData[i] = _deconstructPacket(data[i]);
-      }
-      return newData;
-    } else if ('object' == typeof data && !(data instanceof Date)) {
-      var newData = {};
-      for (var key in data) {
-        newData[key] = _deconstructPacket(data[key]);
-      }
-      return newData;
+        if ((global.Buffer && Buffer.isBuffer(data)) ||
+            (global.ArrayBuffer && data instanceof ArrayBuffer)) { // replace binary
+            var placeholder = {_placeholder: true, num: buffers.length};
+            buffers.push(data);
+            return placeholder;
+        } else if (isArray(data)) {
+            var newData = new Array(data.length);
+            for (var i = 0; i < data.length; i++) {
+                newData[i] = deconstructBinPackRecursive(data[i]);
+            }
+            return newData;
+        } else if ('object' == typeof data && !(data instanceof Date)) {
+            var newData = {};
+            for (var key in data) {
+                newData[key] = deconstructBinPackRecursive(data[key]);
+            }
+            return newData;
+        }
+        return data;
     }
-    return data;
-  }
 
-  var pack = packet;
-  pack.data = _deconstructPacket(packetData);
-  pack.attachments = buffers.length; // number of binary 'attachments'
-  return {packet: pack, buffers: buffers};
-};
+    var pack = packet;
+    pack.data = deconstructBinPackRecursive(packetData);
+    pack.attachments = buffers.length; // number of binary 'attachments'
+    return {packet: pack, buffers: buffers};
+}
 
 /**
  * Reconstructs a binary packet from its placeholder packet and buffers
@@ -35745,31 +36759,31 @@ exports.deconstructPacket = function(packet){
  * @api public
  */
 
-exports.reconstructPacket = function(packet, buffers) {
-  var curPlaceHolder = 0;
+ exports.reconstructPacket = function(packet, buffers) {
+    var curPlaceHolder = 0;
 
-  function _reconstructPacket(data) {
-    if (data && data._placeholder) {
-      var buf = buffers[data.num]; // appropriate buffer (should be natural order anyway)
-      return buf;
-    } else if (isArray(data)) {
-      for (var i = 0; i < data.length; i++) {
-        data[i] = _reconstructPacket(data[i]);
-      }
-      return data;
-    } else if (data && 'object' == typeof data) {
-      for (var key in data) {
-        data[key] = _reconstructPacket(data[key]);
-      }
-      return data;
+    function reconstructBinPackRecursive(data) {
+        if (data && data._placeholder) {
+            var buf = buffers[data.num]; // appropriate buffer (should be natural order anyway)
+            return buf;
+        } else if (isArray(data)) {
+            for (var i = 0; i < data.length; i++) {
+                data[i] = reconstructBinPackRecursive(data[i]);
+            }
+            return data;
+        } else if (data && 'object' == typeof data) {
+            for (var key in data) {
+                data[key] = reconstructBinPackRecursive(data[key]);
+            }
+            return data;
+        }
+        return data;
     }
-    return data;
-  }
 
-  packet.data = _reconstructPacket(packet.data);
-  packet.attachments = undefined; // no longer useful
-  return packet;
-};
+    packet.data = reconstructBinPackRecursive(packet.data);
+    packet.attachments = undefined; // no longer useful
+    return packet;
+ }
 
 /**
  * Asynchronously removes Blobs or Files from data via
@@ -35782,7 +36796,8 @@ exports.reconstructPacket = function(packet, buffers) {
  */
 
 exports.removeBlobs = function(data, callback) {
-  function _removeBlobs(obj, curKey, containingObject) {
+
+  function removeBlobsRecursive(obj, curKey, containingObject) {
     if (!obj) return obj;
 
     // convert any blob
@@ -35807,27 +36822,40 @@ exports.removeBlobs = function(data, callback) {
       };
 
       fileReader.readAsArrayBuffer(obj); // blob -> arraybuffer
-    } else if (isArray(obj)) { // handle array
+    }
+
+    if (isArray(obj)) { // handle array
       for (var i = 0; i < obj.length; i++) {
-        _removeBlobs(obj[i], i, obj);
+        removeBlobsRecursive(obj[i], i, obj);
       }
     } else if (obj && 'object' == typeof obj && !isBuf(obj)) { // and object
       for (var key in obj) {
-        _removeBlobs(obj[key], key, obj);
+        removeBlobsRecursive(obj[key], key, obj);
       }
     }
   }
 
   var pendingBlobs = 0;
   var bloblessData = data;
-  _removeBlobs(bloblessData);
+  removeBlobsRecursive(bloblessData);
   if (!pendingBlobs) {
     callback(bloblessData);
   }
-};
+}
 
-}).call(this,typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./is-buffer":189,"isarray":190}],188:[function(require,module,exports){
+/**
+ * Returns true if obj is a buffer or an arraybuffer.
+ *
+ * @api private
+ */
+function isBuf(obj) {
+  return (global.Buffer && Buffer.isBuffer(obj)) ||
+         (global.ArrayBuffer && obj instanceof ArrayBuffer);
+}
+
+}).call(this,typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {},require("buffer").Buffer)
+},{"buffer":3,"isarray":192}],190:[function(require,module,exports){
+(function (global,Buffer){
 
 /**
  * Module dependencies.
@@ -35836,9 +36864,8 @@ exports.removeBlobs = function(data, callback) {
 var debug = require('debug')('socket.io-parser');
 var json = require('json3');
 var isArray = require('isarray');
-var Emitter = require('component-emitter');
+var Emitter = require('emitter');
 var binary = require('./binary');
-var isBuf = require('./is-buffer');
 
 /**
  * Protocol version.
@@ -35846,7 +36873,7 @@ var isBuf = require('./is-buffer');
  * @api public
  */
 
-exports.protocol = 4;
+exports.protocol = 3;
 
 /**
  * Packet types.
@@ -35920,29 +36947,14 @@ exports.BINARY_EVENT = 5;
 
 exports.BINARY_ACK = 6;
 
-/**
- * Encoder constructor.
- *
- * @api public
- */
-
-exports.Encoder = Encoder;
-
-/**
- * Decoder constructor.
- *
- * @api public
- */
-
-exports.Decoder = Decoder;
+exports.Encoder = Encoder
 
 /**
  * A socket.io Encoder instance
  *
  * @api public
  */
-
-function Encoder() {}
+function Encoder() {};
 
 /**
  * Encode a packet as a single string if non-binary, or as a
@@ -36037,6 +37049,8 @@ function encodeAsBinary(obj, callback) {
   binary.removeBlobs(obj, writeEncoding);
 }
 
+exports.Decoder = Decoder
+
 /**
  * A socket.io Decoder instance
  *
@@ -36077,7 +37091,9 @@ Decoder.prototype.add = function(obj) {
       this.emit('decoded', packet);
     }
   }
-  else if (isBuf(obj) || obj.base64) { // raw binary data
+  else if ((global.Buffer && Buffer.isBuffer(obj)) ||
+            (global.ArrayBuffer && obj instanceof ArrayBuffer) ||
+            obj.base64) { // raw binary data
     if (!this.reconstructor) {
       throw new Error('got binary data when not reconstructing a packet');
     } else {
@@ -36091,7 +37107,7 @@ Decoder.prototype.add = function(obj) {
   else {
     throw new Error('Unknown type: ' + obj);
   }
-};
+}
 
 /**
  * Decode a packet String (JSON data)
@@ -36158,7 +37174,7 @@ function decodeString(str) {
 
   debug('decoded %s as %j', str, p);
   return p;
-}
+};
 
 /**
  * Deallocates a parser's resources
@@ -36170,7 +37186,7 @@ Decoder.prototype.destroy = function() {
   if (this.reconstructor) {
     this.reconstructor.finishedReconstruction();
   }
-};
+}
 
 /**
  * A manager of a binary event's 'buffer sequence'. Should
@@ -36205,7 +37221,7 @@ BinaryReconstructor.prototype.takeBinaryData = function(binData) {
     return packet;
   }
   return null;
-};
+}
 
 /**
  * Cleans up binary packet reconstruction variables.
@@ -36216,7 +37232,7 @@ BinaryReconstructor.prototype.takeBinaryData = function(binData) {
 BinaryReconstructor.prototype.finishedReconstruction = function() {
   this.reconPack = null;
   this.buffers = [];
-};
+}
 
 function error(data){
   return {
@@ -36225,26 +37241,174 @@ function error(data){
   };
 }
 
-},{"./binary":187,"./is-buffer":189,"component-emitter":156,"debug":157,"isarray":190,"json3":191}],189:[function(require,module,exports){
-(function (global){
-
-module.exports = isBuf;
+}).call(this,typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {},require("buffer").Buffer)
+},{"./binary":189,"buffer":3,"debug":160,"emitter":191,"isarray":192,"json3":193}],191:[function(require,module,exports){
 
 /**
- * Returns true if obj is a buffer or an arraybuffer.
+ * Module dependencies.
+ */
+
+var index = require('indexof');
+
+/**
+ * Expose `Emitter`.
+ */
+
+module.exports = Emitter;
+
+/**
+ * Initialize a new `Emitter`.
  *
+ * @api public
+ */
+
+function Emitter(obj) {
+  if (obj) return mixin(obj);
+};
+
+/**
+ * Mixin the emitter properties.
+ *
+ * @param {Object} obj
+ * @return {Object}
  * @api private
  */
 
-function isBuf(obj) {
-  return (global.Buffer && global.Buffer.isBuffer(obj)) ||
-         (global.ArrayBuffer && obj instanceof ArrayBuffer);
+function mixin(obj) {
+  for (var key in Emitter.prototype) {
+    obj[key] = Emitter.prototype[key];
+  }
+  return obj;
 }
 
-}).call(this,typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],190:[function(require,module,exports){
-module.exports=require(183)
-},{}],191:[function(require,module,exports){
+/**
+ * Listen on the given `event` with `fn`.
+ *
+ * @param {String} event
+ * @param {Function} fn
+ * @return {Emitter}
+ * @api public
+ */
+
+Emitter.prototype.on = function(event, fn){
+  this._callbacks = this._callbacks || {};
+  (this._callbacks[event] = this._callbacks[event] || [])
+    .push(fn);
+  return this;
+};
+
+/**
+ * Adds an `event` listener that will be invoked a single
+ * time then automatically removed.
+ *
+ * @param {String} event
+ * @param {Function} fn
+ * @return {Emitter}
+ * @api public
+ */
+
+Emitter.prototype.once = function(event, fn){
+  var self = this;
+  this._callbacks = this._callbacks || {};
+
+  function on() {
+    self.off(event, on);
+    fn.apply(this, arguments);
+  }
+
+  fn._off = on;
+  this.on(event, on);
+  return this;
+};
+
+/**
+ * Remove the given callback for `event` or all
+ * registered callbacks.
+ *
+ * @param {String} event
+ * @param {Function} fn
+ * @return {Emitter}
+ * @api public
+ */
+
+Emitter.prototype.off =
+Emitter.prototype.removeListener =
+Emitter.prototype.removeAllListeners = function(event, fn){
+  this._callbacks = this._callbacks || {};
+
+  // all
+  if (0 == arguments.length) {
+    this._callbacks = {};
+    return this;
+  }
+
+  // specific event
+  var callbacks = this._callbacks[event];
+  if (!callbacks) return this;
+
+  // remove all handlers
+  if (1 == arguments.length) {
+    delete this._callbacks[event];
+    return this;
+  }
+
+  // remove specific handler
+  var i = index(callbacks, fn._off || fn);
+  if (~i) callbacks.splice(i, 1);
+  return this;
+};
+
+/**
+ * Emit `event` with the given args.
+ *
+ * @param {String} event
+ * @param {Mixed} ...
+ * @return {Emitter}
+ */
+
+Emitter.prototype.emit = function(event){
+  this._callbacks = this._callbacks || {};
+  var args = [].slice.call(arguments, 1)
+    , callbacks = this._callbacks[event];
+
+  if (callbacks) {
+    callbacks = callbacks.slice(0);
+    for (var i = 0, len = callbacks.length; i < len; ++i) {
+      callbacks[i].apply(this, args);
+    }
+  }
+
+  return this;
+};
+
+/**
+ * Return array of callbacks for `event`.
+ *
+ * @param {String} event
+ * @return {Array}
+ * @api public
+ */
+
+Emitter.prototype.listeners = function(event){
+  this._callbacks = this._callbacks || {};
+  return this._callbacks[event] || [];
+};
+
+/**
+ * Check if this emitter has `event` handlers.
+ *
+ * @param {String} event
+ * @return {Boolean}
+ * @api public
+ */
+
+Emitter.prototype.hasListeners = function(event){
+  return !! this.listeners(event).length;
+};
+
+},{"indexof":186}],192:[function(require,module,exports){
+module.exports=require(185)
+},{}],193:[function(require,module,exports){
 /*! JSON v3.2.6 | http://bestiejs.github.io/json3 | Copyright 2012-2013, Kit Cambridge | http://kit.mit-license.org */
 ;(function (window) {
   // Convenience aliases.
@@ -37107,7 +38271,7 @@ module.exports=require(183)
   }
 }(this));
 
-},{}],192:[function(require,module,exports){
+},{}],194:[function(require,module,exports){
 module.exports = toArray
 
 function toArray(list, index) {
@@ -37122,7 +38286,7 @@ function toArray(list, index) {
     return array
 }
 
-},{}],193:[function(require,module,exports){
+},{}],195:[function(require,module,exports){
 "use strict";
 var io = require("socket.io-client"),
 	$ = require("jquery"),
@@ -37191,7 +38355,7 @@ var app = {
 };
 
 module.exports = app.init();
-},{"./base/Router":195,"./views/page":199,"backbone":1,"backbone/node_modules/underscore":2,"jquery":4,"react":148,"socket.io-client":149}],194:[function(require,module,exports){
+},{"./base/Router":197,"./views/page":201,"backbone":1,"backbone/node_modules/underscore":2,"jquery":7,"react":151,"socket.io-client":152}],196:[function(require,module,exports){
 module.exports = function(app){
 	
 	var RoomListener = function(options){
@@ -37203,7 +38367,8 @@ module.exports = function(app){
 		init: function(){
 			// on init, go ahead and start listening
 			app.socket.emit("joinRoom", {
-				room: this.options.room
+				room: this.options.room,
+				cacheRange: "lastHour"
 			});
 			app.socket.on("data", function(data){
 				app.dispatcher.trigger("data", data);
@@ -37218,7 +38383,7 @@ module.exports = function(app){
 
 	return RoomListener;
 };
-},{}],195:[function(require,module,exports){
+},{}],197:[function(require,module,exports){
 var _ = require("backbone/node_modules/underscore"),
 	React = require("react"),
 	RoomListener;
@@ -37266,9 +38431,9 @@ module.exports = function(app, Backbone){
 	});
 };
 
-},{"./RoomListener":194,"backbone/node_modules/underscore":2,"react":148}],196:[function(require,module,exports){
-module.exports=require(193)
-},{"./base/Router":195,"./views/page":199,"backbone":1,"backbone/node_modules/underscore":2,"jquery":4,"react":148,"socket.io-client":149}],197:[function(require,module,exports){
+},{"./RoomListener":196,"backbone/node_modules/underscore":2,"react":151}],198:[function(require,module,exports){
+module.exports=require(195)
+},{"./base/Router":197,"./views/page":201,"backbone":1,"backbone/node_modules/underscore":2,"jquery":7,"react":151,"socket.io-client":152}],199:[function(require,module,exports){
 /** @jsx React.DOM */
 var React = require("react");
 
@@ -37297,7 +38462,7 @@ var TopNav = React.createClass({displayName: 'TopNav',
 });
 
 module.exports = TopNav;
-},{"react":148}],198:[function(require,module,exports){
+},{"react":151}],200:[function(require,module,exports){
 /** @jsx React.DOM */
 var React = require("react"),
 	app = require("../app");
@@ -37340,7 +38505,7 @@ var MainView = React.createClass({displayName: 'MainView',
 });
 
 module.exports = MainView;
-},{"../app":193,"react":148}],199:[function(require,module,exports){
+},{"../app":195,"react":151}],201:[function(require,module,exports){
 /** @jsx React.DOM */
 var React = require("react"),
 	MainView = require("./main"),
@@ -37385,4 +38550,4 @@ var PageView = React.createClass({displayName: 'PageView',
 
 module.exports = PageView;
 
-},{"./components/topnav":197,"./main":198,"react":148}]},{},[196])
+},{"./components/topnav":199,"./main":200,"react":151}]},{},[198])

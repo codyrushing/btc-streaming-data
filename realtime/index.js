@@ -34,7 +34,7 @@ module.exports = (function(){
 			if(data.room){
 				socket.join(data.room);
 				if(this.rooms && this.rooms.hasOwnProperty(data.room)){
-					this.rooms[data.room].on_join(socket);
+					this.rooms[data.room].on_join(data, socket);
 				}
 				console.log("socket with id %s has joined this room", socket.id);
 			}

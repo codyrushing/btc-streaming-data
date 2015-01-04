@@ -1,0 +1,4 @@
+- user enters room, requesting a cache
+- the cache creates an instance of a RoomStream which we pass to the Room.  RoomStream is written to late
+- mongodb queries based on the range, returning a mongodb cursor
+- mongodb cursor stream --- pipe ---> medianReducer (finds appropriate median values) --- pipe ---> takes median values and passes them to socket.io where they arrive at the front end.

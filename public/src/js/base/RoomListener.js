@@ -9,7 +9,8 @@ module.exports = function(app){
 		init: function(){
 			// on init, go ahead and start listening
 			app.socket.emit("joinRoom", {
-				room: this.options.room
+				room: this.options.room,
+				cacheRange: "lastHour"
 			});
 			app.socket.on("data", function(data){
 				app.dispatcher.trigger("data", data);
