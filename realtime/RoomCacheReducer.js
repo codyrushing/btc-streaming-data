@@ -74,18 +74,23 @@ RoomCacheReducer.prototype = {
 		}
 	},
 	init: function(){
+		var range;
 		if(this.options.rangeName && this.ranges.hasOwnProperty(this.options.rangeName)){
+			range = this.ranges[this.options.rangeName];
 			this.getDataLimitsForRange(
-				this.ranges[this.options.rangeName], 
-				function(err, cursor, range, minValue, maxValue){
-					var stream,
+				range,
+				function(err, cursor, minValue, maxValue){
+					var dbStream = cursor.stream(),
 						dest = new SocketStream(this.options.roomName, this.options.rangeName, this.options.socket);
-					if(err || !minValue || !maxValue){
-						stream = cursor.stream();
+
+					// TODO make this more elegant	
+					if(dbStream && (err || !minValue || !maxValue) ){
+						// if we got the data back, but there wasn't enough of to necessitate a cacheReducer, just pipe it to the socket
+						dbStream.pipe(dest);
 					} else {
-						stream = this.getMedianStream(cursor, range, minValue, maxValue);	
-					}			
-					stream.pipe(dest);
+						// otherwise, run it through the reducer first, then pipe it to the socket
+						dbStream.pipe( this.getMedianStream(err, cursor, range, minValue, maxValue) ).pipe(dest);
+					}
 				}.bind(this)
 			)
 		}
@@ -113,11 +118,10 @@ RoomCacheReducer.prototype = {
 	finalCallback(err, cursor, minValue, maxValue)
 	*/
 	getDataLimitsForRange: function(range, finalCallback){
-		var rangeCursor = this.getDBCursorForRange(range);
-
 		async.waterfall([
 			/*  get the count */
 			function(cb){
+				var rangeCursor = this.getDBCursorForRange(range);
 				rangeCursor.count(false, function(err, count){
 					cb(err, rangeCursor, count);
 				});
@@ -130,11 +134,11 @@ RoomCacheReducer.prototype = {
 					ascSort = {};
 					ascSort[range.field] = 1;
 					
-					cursor.sort(ascSort).limit(1).toArray(function(err, items){
-						cb(err, cursor.rewind(), items.length ? items[0][range.field] : null);
-					});
+					cursor.sort(ascSort).limit(3).toArray(function(err, items){
+						cb(err, this.getDBCursorForRange(range), items.length ? items[0][range.field] : null);
+					}.bind(this));
 				} else {
-					cb("Not enough data in storage - no pruning necessary", cursor, null, null);
+					cb("Not enough data in storage - no pruning necessary", this.getDBCursorForRange(range), null, null);
 				}
 			}.bind(this),
 			/* then get the max value */
@@ -144,7 +148,7 @@ RoomCacheReducer.prototype = {
 				descSort[range.field] = -1;
 
 				cursor.sort(descSort).limit(1).toArray(function(err, items){
-					cb(err, rangeCursor, minValue, items.length ? items[0][range.field] : null);
+					cb(err, this.getDBCursorForRange(range), minValue, items.length ? items[0][range.field] : null);
 				}.bind(this));
 			}.bind(this),
 		], finalCallback);
@@ -157,28 +161,35 @@ RoomCacheReducer.prototype = {
 			ascSort = {},
 			medianPointInterval = dataRange / range.size-1,
 			medianPointIndex = 0,
+			medianPoint,
 			diff, iDiff,
 			curr, prev,
 			cursorStream,
-			outputStream = require("stream").transform();
+			outputStream = new require("stream").Transform( { objectMode: true } );
 
 		var setMedianPoint = function(){
 			// setup values needed
-			medianPoint = minValue + medianPointInterval*medianPointIndex;
+			medianPoint = parseInt(minValue + medianPointInterval*medianPointIndex);
+			if(range.field === "date"){
+				medianPoint = new Date(parseInt(minValue.getTime() + medianPointInterval*medianPointIndex));
+			} else {
+				medianPoint = minValue + medianPointInterval*medianPointIndex;
+			}
 			iDiff = Infinity;
 		};
 
 		setMedianPoint();
 
 		ascSort[range.field] = 1;
+
 		cursorStream = cursor.sort(ascSort).stream();
 
-		cursorStream.on("data", function(data){
+		outputStream._transform = function(data, encoding, done){
 			// comparator function
 			iDiff = Math.abs(medianPoint - data[range.field]);
-			if(iDiff > diff){
+			if(prev && iDiff > diff){
 				// prev is our closest point
-				outputStream.write(prev);
+				this.push(prev);
 				medianPointIndex++;
 				setMedianPoint();
 			}
@@ -189,17 +200,20 @@ RoomCacheReducer.prototype = {
 			// }
 			prev = data;
 			diff = iDiff;
-		}.bind(this));
+			done();
+		};
 
-		cursorStream.on("end", function(){
+		outputStream._flush = function(done){
 			// if we've arrived at the end of the stream and still haven't found all of our matching points
 			// then send in the last item we have from the stream
 			if(medianPointIndex < range.size-1){
-				outputStream.write(prev);
+				this.push(prev);
 			}
-		});
+			done();
+		};
 
 		return outputStream;
-	}};
+	}
+};
 
 module.exports = RoomCacheReducer;
