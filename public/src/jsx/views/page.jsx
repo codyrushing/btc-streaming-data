@@ -1,6 +1,6 @@
 var React = require("react"),
-	MainView = require("./main"),
-	TopNav = require("./components/topnav");
+	TopNav = require("./components/topnav"),
+	ExchangeRate = require("./main/exchange-rate");
 
 var PageView = React.createClass({
 	componentWillMount : function() {
@@ -9,6 +9,7 @@ var PageView = React.createClass({
 	componentWillUnmount : function() {
     	this.props.dispatcher.off("route", this.onroute, this);
   	},
+  	// Backbone Router will emit "route" events to dispatcher on route change
 	onroute: function(route){
 		this.setState({
 			currentRoute: route
@@ -16,10 +17,24 @@ var PageView = React.createClass({
 	},
   	getInitialState: function(){
   		return {
-  			route: "/"
+  			currentRoute: "/"
   		};
   	},
+  	getMainView: function(){
+		switch(this.state.currentRoute){
+			case "/exchange-rate":
+				return ExchangeRate;
+			default:
+				return React.createClass({
+					render: function(){
+						return (<main>{this.props.currentRoute} Not found...</main>);
+					}
+				});
+		};
+  	},
   	render: function() {
+		var MainView = this.getMainView();
+
 		return (
 			<section className="wrapper">
 				<header>
@@ -28,7 +43,7 @@ var PageView = React.createClass({
 					</a>
 					<TopNav currentRoute={this.state.currentRoute} />
 				</header>
-				<MainView dispatcher={this.props.dispatcher} />
+				<MainView dispatcher={this.props.dispatcher} socket={this.props.socket} />
 				<footer>
 					<nav>
 						<a href="https://github.com/codyrushing/btc-streaming-data" target="_blank">Github</a>

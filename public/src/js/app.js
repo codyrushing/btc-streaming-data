@@ -4,8 +4,7 @@ var io = require("socket.io-client"),
 	_ = require("backbone/node_modules/underscore"),
 	React = require("react"),
 	Backbone = require("backbone"),
-	pageView = require("./views/page"),
-	Router;
+	pageView = require("./views/page");
 
 // DEV ONLY - REMOVE THIS IN PRODUCTION
 window.React = React;
@@ -15,7 +14,6 @@ Backbone.$ = $;
 var app = {
 	init: function(){
 		// defined here because it needs access to our app object
-		Router = require("./base/Router")(this, Backbone);
 		this.dispatcher = _.extend(Backbone.Events);
 		this.socketConnect();
 		this.initRouter();
@@ -36,10 +34,11 @@ var app = {
 			pushState: true,
 			hashChange: false
 		});
-		this.bindEvents($(document));
+
+		this.bindEvents(document);
 	},
 	bindEvents: function(root){
-		root.on("click", "a[href^='/'], a[href^='#'] a[href^='"+this.fullHost+"']", function(e) {
+		$(root).on("click", "a[href^='/'], a[href^='#'] a[href^='"+this.fullHost+"']", function(e) {
 			if (!e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
 				e.preventDefault();
 				var hostRe = new RegExp("^"+this.fullHost),
@@ -60,8 +59,7 @@ var app = {
 		this.router.navigate(route, { trigger: true });
 	},
 	initRouter: function(){
-		this.router = new Router();
-		//_.extend(this.router, Backbone.Events);
+		this.router = new (require("./base/Router")(this.dispatcher))();
 	}
 };
 

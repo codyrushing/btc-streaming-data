@@ -35,7 +35,7 @@ gulp.task("react", function(){
 		.pipe( gulp.dest(paths.dest.views) );
 });
 
-gulp.task("scripts", ["jshint"], function(){
+gulp.task("scripts", /*["jshint"],*/ function(){
 	return gulp.start("browserify");
 });
 
@@ -51,7 +51,9 @@ gulp.task("jshint", function(){
 gulp.task("browserify", function(){
 	return gulp.src(paths.src.js + "app.js")
 		.pipe(plumber())
-		.pipe(browserify())
+		.pipe(browserify({
+			debug: true
+		}))
 		.pipe( gulp.dest( paths.dest.js ) );
 });
 

@@ -1,27 +1,26 @@
-module.exports = function(app){
-	
-	var RoomListener = function(options){
-		this.options = options;
-		this.init();
-	};
-
-	RoomListener.prototype = {
-		init: function(){
-			// on init, go ahead and start listening
-			app.socket.emit("joinRoom", {
-				room: this.options.room,
-				cacheRange: "lastHour"
-			});
-			app.socket.on("data", function(data){
-				app.dispatcher.trigger("data", data);
-			}.bind(this));
-		},
-		stop: function(){
-			app.socket.emit("leaveRoom", {
-				room: this.options.room
-			});
-		}
-	};
-
-	return RoomListener;
+var RoomListener = function(socket, dispatcher, options){
+	this.socket = socket;
+	this.dispatcher = dispatcher;
+	this.options = options;
+	this.init();
 };
+
+RoomListener.prototype = {
+	init: function(){
+		// on init, go ahead and start listening
+		this.socket.emit("joinRoom", {
+			room: this.options.room,
+			cacheRange: "lastHour"
+		});
+		this.socket.on("data", function(data){
+			this.dispatcher.trigger("data", data);
+		}.bind(this));
+	},
+	exit: function(){
+		this.socket.emit("leaveRoom", {
+			room: this.options.room
+		});
+	}
+};
+
+module.exports = RoomListener;
