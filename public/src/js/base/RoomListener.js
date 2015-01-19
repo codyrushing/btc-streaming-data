@@ -13,10 +13,11 @@ RoomListener.prototype = {
 			cacheRange: "lastHour"
 		});
 		this.socket.on("data", function(data){
-			this.dispatcher.trigger("data", data);
+			this.dispatcher.emit("data", data);
 		}.bind(this));
 	},
 	exit: function(){
+		this.socket.off("data");
 		this.socket.emit("leaveRoom", {
 			room: this.options.room
 		});

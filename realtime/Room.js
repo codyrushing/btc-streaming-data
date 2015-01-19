@@ -32,7 +32,6 @@ Room.prototype = {
 	on_join: function(socket, data){
 		this.updateRoomStatus();
 		this.dispatcher.emit("join:" + this.options.name, socket, data);
-		//socket.emit("data", this.medianRange);
 	},
 	// called only when client emits custom "leave" event
 	on_leave: function(socket){
@@ -47,7 +46,6 @@ Room.prototype = {
 			this.on_empty();
 			this.active = false;
 		}
-		//this.getNumberOfListeners() ? this.on_active() : this.on_empty();
 	},
 	on_data: function(data){
 		if(!data.date){

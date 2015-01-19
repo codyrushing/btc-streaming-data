@@ -20,8 +20,7 @@ SocketStream.prototype._transform = function(data, encoding, done){
 	if(this.rangeName){
 		eventNames.push(this.rangeName);
 	}
-	console.log("streaming data to socket from date %s", data.date);
-	this.socket.emit(eventNames.join(":"), data);
+	this.socket.emit("data" /*eventNames.join(":")*/, data);
 	done();
 };
 
