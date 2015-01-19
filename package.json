@@ -15,8 +15,8 @@
   },
   "devDependencies": {
     "async": "~0.9.0",
-    "backbone": "~1.1.2",
     "body-parser": "~1.4.3",
+    "eventemitter2": "^0.4.14",
     "express": "~4.6.1",
     "finalhandler": "~0.1.0",
     "gulp": "~3.8.6",
