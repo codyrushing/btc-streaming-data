@@ -1,5 +1,6 @@
 /** @jsx React.DOM */
-var React = require("react")
+var React = require("react"),
+	LineGraph = require("../charts/line-graph"),
 	RoomListener = require("../../base/RoomListener");
 
 var ExchangeRateView = React.createClass({displayName: 'ExchangeRateView',
@@ -26,14 +27,14 @@ var ExchangeRateView = React.createClass({displayName: 'ExchangeRateView',
 		};
 	},
   	render: function() {
-  		var exchangeRateEntries = this.state.entries.map(function(entry){
-  			return (
-  				React.DOM.p(null, entry.date)
-  			);
-  		});
+  		// var exchangeRateEntries = this.state.entries.map(function(entry){
+  		// 	return (
+  		// 		<p>{entry.date}</p>
+  		// 	);
+  		// });
   		return (
   			React.DOM.main({className: "exchange-rate"}, 
-  				exchangeRateEntries
+  				LineGraph({data: this.state.entries})
   			)
   		);
   	}
