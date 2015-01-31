@@ -12,6 +12,7 @@
   "dependencies": {
     "d3": "^3.5.3",
     "gulp-browserify": "^0.5.0",
+    "moment": "^2.9.0",
     "mongodb": "^2.0.12"
   },
   "devDependencies": {
