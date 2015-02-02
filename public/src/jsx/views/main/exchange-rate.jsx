@@ -1,9 +1,9 @@
 var React = require("react"),
-	LineGraph = require("../charts/line-graph"),
+	LineGraph = require("../../ui/line-graph"),
 	RoomListener = require("../../base/RoomListener");
 
 var ExchangeRateView = React.createClass({
-	componentWillMount: function() {
+	componentWillMount: function(){
 		this.props.dispatcher.on("data", this.ondata.bind(this));
 		this.roomListener = new RoomListener(this.props.socket, this.props.dispatcher, {
 			room: "exchange-rate"
@@ -12,6 +12,19 @@ var ExchangeRateView = React.createClass({
 	componentWillUnmount: function(){
 		this.props.dispatcher.off("data", this.ondata.bind(this));
 		this.roomListener.exit();
+	},
+	componentDidMount: function(){
+		this.chartContainer = this.getDOMNode().querySelectorAll(".chart-container")[0];
+		this.lineGraph = new LineGraph(
+			this.chartContainer,
+			{},
+			this.state
+		);
+	},
+	componentDidUpdate: function(){
+		if(this.lineGraph){
+			this.lineGraph.update(this.state);
+		}
 	},
 	ondata: function(data){
 		var entries = this.state.entries;
@@ -26,14 +39,17 @@ var ExchangeRateView = React.createClass({
 		};
 	},
   	render: function() {
-  		// var exchangeRateEntries = this.state.entries.map(function(entry){
-  		// 	return (
-  		// 		<p>{entry.date}</p>
-  		// 	);
-  		// });
+  		var exchangeRateEntries = this.state.entries.map(function(entry){
+  			return (
+  				<p>{entry.date}</p>
+  			);
+  		});
   		return (
   			<main className="exchange-rate">
-  				<LineGraph data={this.state.entries} />
+  				{exchangeRateEntries}
+  				<div className="chart-container">
+
+  				</div>
   			</main>
   		);
   	}
