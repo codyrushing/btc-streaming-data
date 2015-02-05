@@ -19,12 +19,12 @@ var ExchangeRateView = React.createClass({displayName: 'ExchangeRateView',
 		this.lineGraph = new LineGraph(
 			this.chartContainer,
 			{},
-			this.state
+			this.state.entries
 		);
 	},
 	componentDidUpdate: function(){
 		if(this.lineGraph){
-			this.lineGraph.update(this.state);
+			this.lineGraph.update(this.state.entries);
 		}
 	},
 	ondata: function(data){
