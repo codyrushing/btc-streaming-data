@@ -17,7 +17,10 @@ var ExchangeRateView = React.createClass({
 		this.chartContainer = this.getDOMNode().querySelectorAll(".chart-container")[0];
 		this.lineGraph = new LineGraph(
 			this.chartContainer,
-			{},
+			{
+				width: 500,
+				height: 300
+			},
 			this.state.entries
 		);
 	},
