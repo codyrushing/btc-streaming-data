@@ -39,7 +39,6 @@ LineGraph.prototype = {
 		    });
 	},
 	build: function(){
-
 		this.x
 			.domain(d3.extent(this.state, function(d) { 
 				return d.date._d; 
