@@ -79,10 +79,12 @@ gulp.task("server", function(){
 		ignore: ["public/", "gulpfile.js"]
 	});
 
-	if(nodeArgs){		
+	if(nodeArgs.length){		
 		require("child_process").spawn("node-inspector");
 		require("child_process").spawn("open", ["http://localhost:8080/debug?port=5858"]);
 	}
+
+	require("child_process").spawn("open", ["http://localhost:3003/"]);
 
 	return r;
 
