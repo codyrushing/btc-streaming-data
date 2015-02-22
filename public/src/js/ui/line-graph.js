@@ -5,31 +5,24 @@ var LineGraph = function(el, props, state){
 	this.props = props;
 	this.state = state;
 	this.init();
-	this.build();
 };
 
 LineGraph.prototype = {
 	init: function(){
-		var self = this,
-			margin = {top: 20, right: 20, bottom: 30, left: 50};
-			
-		this.graphWidth = this.props.width - margin.left - margin.right,
-		this.graphHeight = this.props.height - margin.top - margin.bottom;
+		var self = this;
 
-		this.svg = d3.select(this.el).append("svg")
-			.attr("height", this.props.height)
-			.attr("width", this.props.width)
-			.append("g")
-			.attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+		this.margin = {top: 20, right: 20, bottom: 30, left: 50};
+		this.graphWidth = this.props.width - this.margin.left - this.margin.right,
+		this.graphHeight = this.props.height - this.margin.top - this.margin.bottom;
 
 		this.x = d3.time.scale()
-				.range([0, this.graphWidth]);
+			.range([0, this.graphWidth]);
 		
 		this.y = d3.time.scale()
-				.range([this.graphHeight, 0]);
+			.range([this.graphHeight, 0]);
 
 		this.xAxis = d3.svg.axis()
-		    .scale(this.x)
+			.scale(this.x)
 		    .orient("bottom");
 
 		this.yAxis = d3.svg.axis()
@@ -37,73 +30,111 @@ LineGraph.prototype = {
 		    .orient("left");
 
 		this.line = d3.svg.line()
+			// control the curve of the line here
 		    .interpolate("cardinal")
 		    .x(function(d) { 
-		    	return self.x(d.date._d); 
-		    })
+		    	return this.x(this.xAccessor(d));
+		    }.bind(this))
 		    .y(function(d) { 
-		    	return self.y(d.USD.last); 
-		    });
+		    	return this.y(this.yAccessor(d));
+		    }.bind(this));
+
+		this.buildDOM();
 	},
-	build: function(){
-		this.x
-			.domain(d3.extent(this.state, function(d) { 
-				return d.date._d; 
-			}));
-  		
-  		this.y
-  			.domain(d3.extent(this.state, function(d) { 
-  				return d.USD.last; 
-  			}));
+	buildDOM: function(){
 
-  		this.svg.select(".x.axis").remove();
+		this.svg = d3.select(this.el).append("svg")
+			.attr("height", this.props.height)
+			.attr("width", this.props.width)
+			.append("g")
+			.attr("transform", "translate(" + this.margin.left + "," + this.margin.top + ")");
 
-		this.svg.append("g")
+		this.linePath = this.svg.append("path")
+			.attr("class", "line");
+
+		this.xAxisGroup = this.svg.append("g")
 			.attr("class", "x axis")
-			.attr("transform", "translate(0," + this.graphHeight + ")")
-			.call(this.xAxis);
+			.attr("transform", "translate(0," + this.graphHeight + ")");
 
-  		this.svg.select(".y.axis").remove();
+		this.yAxisGroup = this.svg.append("g")
+			.attr("class", "y axis");
 
-		this.svg.append("g")
-			.attr("class", "y axis")
-			.call(this.yAxis)
-			.append("text")
-		      .attr("transform", "rotate(-90)")
-		      .attr("y", 6)
-		      .attr("dy", ".71em")
-		      .style("text-anchor", "end")
-		      .text("Exchange rate");
+		// this.yAxisLabel = this.yAxisGroup.append("text")
+		// 	.attr("class", "label")
+		// 	.attr("transform", "rotate(-90)")
+		// 	.attr("y", 6)
+		// 	.attr("dy", ".71em")
+		// 	.style("text-anchor", "end")
+		// 	.text("Exchange rate");
 
-		this.svg.select(".line").remove();
 
-		this.svg.append("path")
-			.datum(this.state)
-			.attr("class", "line")
-			.attr("d", this.line);
+	},
+	drawPoints: function(){
+		var self = this,
+			points = this.svg.selectAll(".point")
+				.data(this.state);
 
-		this.point = this.svg.selectAll(".point")
-			.data(this.state);
-
-		this.point
-			.enter().append("svg:circle")
-			.attr("class", "point")
+		points
+			.transition()
 			.attr("cx", function(d){
-				console.log(d.date._d);
-				console.log(this.x(d.date._d));
-				return this.x(d.date._d);
-			}.bind(this))
+				return self.x(self.xAccessor(d));
+			})
 			.attr("cy", function(d){
-				return this.y(d.USD.last)
-			}.bind(this))
-			.attr("r", 3);
+				return self.y(self.yAccessor(d));
+			});
 
-		this.point.exit().remove();
+		points
+			.enter().append("svg:circle")
+			.attr("class", "point")			
+			.attr("r", 3)			
+			.attr("cx", function(d){
+				return self.x(self.xAccessor(d));
+			})
+			.attr("cy", function(d){
+				return self.y(self.yAccessor(d));
+			});
+
+		points.exit().remove();
+	},
+	xAccessor: function(d){
+		return d.date._d;
+	},
+	yAccessor: function(d){
+		return d.USD.last;
 	},
 	update: function(state){
-		this.state = state;
-		this.build();
-		// anything other recalculations that need to happen on update can go here
+		/* SET DOMAINS */
+		var yMin, yMax;
+
+		if(state){
+			this.state = state;
+		}
+
+		yMin = d3.min(this.state, this.yAccessor);
+		yMax = d3.max(this.state, this.yAccessor);
+  		
+  		this.x
+  			.domain(d3.extent(this.state, this.xAccessor));
+
+		this.y
+  			.domain([
+  				yMin - (yMax-yMin)/3,
+  				yMax + (yMax-yMin)/3
+  			]);
+
+		this.xAxisGroup
+			.call(this.xAxis);
+
+		this.yAxisGroup
+			.call(this.yAxis);
+
+		this.linePath
+			.datum(this.state)
+			.transition()
+			.attr("d", this.line);
+
+		this.drawPoints();
+
 	}
 };
 

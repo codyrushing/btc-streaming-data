@@ -19,8 +19,8 @@ var ExchangeRateView = React.createClass({displayName: 'ExchangeRateView',
 		this.lineGraph = new LineGraph(
 			this.chartContainer,
 			{
-				width: 500,
-				height: 300
+				width: 800,
+				height: 500
 			},
 			this.state.entries
 		);
@@ -50,7 +50,6 @@ var ExchangeRateView = React.createClass({displayName: 'ExchangeRateView',
   		});
   		return (
   			React.DOM.main({className: "exchange-rate"}, 
-  				exchangeRateEntries, 
   				React.DOM.div({className: "chart-container"}
 
   				)
