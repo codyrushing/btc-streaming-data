@@ -413,20 +413,6 @@ h1 {
   padding: 0;
   margin: 0; }
 
-.axis path,
-.axis line {
-  fill: none;
-  stroke: #000;
-  shape-rendering: crispEdges; }
-
-.x.axis path {
-  display: none; }
-
-.line {
-  fill: none;
-  stroke: steelblue;
-  stroke-width: 1.5px; }
-
 header {
   padding-top: 1.69492%; }
   header nav {
@@ -501,5 +487,22 @@ main.home {
       margin-left: 76.27119%;
       margin-right: -100%;
       clear: none; }
+
+.line-graph .axis path,
+.line-graph .axis line {
+  fill: none;
+  stroke: #ccc;
+  shape-rendering: crispEdges; }
+.line-graph text {
+  fill: #ccc; }
+.line-graph .line {
+  fill: none;
+  stroke: #4682B4;
+  stroke-width: 1.5px; }
+.line-graph .point {
+  fill: #4682B4; }
+.line-graph .area {
+  fill: #4682B4;
+  opacity: 0.5; }
 
 /*# sourceMappingURL=style.css.map */

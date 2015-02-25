@@ -10,6 +10,7 @@ var LineGraph = function(el, props, state){
 LineGraph.prototype = {
 	init: function(){
 		var self = this;
+			lineInterpolation = "linear";
 
 		this.margin = {top: 20, right: 20, bottom: 30, left: 50};
 		this.graphWidth = this.props.width - this.margin.left - this.margin.right,
@@ -18,7 +19,7 @@ LineGraph.prototype = {
 		this.x = d3.time.scale()
 			.range([0, this.graphWidth]);
 		
-		this.y = d3.time.scale()
+		this.y = d3.scale.linear()
 			.range([this.graphHeight, 0]);
 
 		this.xAxis = d3.svg.axis()
@@ -27,17 +28,24 @@ LineGraph.prototype = {
 
 		this.yAxis = d3.svg.axis()
 		    .scale(this.y)
+		    .ticks(10)
 		    .orient("left");
-
+		
 		this.line = d3.svg.line()
 			// control the curve of the line here
-		    .interpolate("cardinal")
+		    .interpolate(lineInterpolation)
 		    .x(function(d) { 
 		    	return this.x(this.xAccessor(d));
 		    }.bind(this))
 		    .y(function(d) { 
 		    	return this.y(this.yAccessor(d));
 		    }.bind(this));
+
+		this.areaGenerator = d3.svg.area()
+			.interpolate(lineInterpolation)
+			.x(this.xAccessor)
+			.y0(this.graphHeight)
+			.y1(this.yAccessor);
 
 		this.buildDOM();
 	},
@@ -46,11 +54,23 @@ LineGraph.prototype = {
 		this.svg = d3.select(this.el).append("svg")
 			.attr("height", this.props.height)
 			.attr("width", this.props.width)
+			.attr("class", "line-graph")
 			.append("g")
 			.attr("transform", "translate(" + this.margin.left + "," + this.margin.top + ")");
 
 		this.linePath = this.svg.append("path")
 			.attr("class", "line");
+
+		this.clipPath = this.svg.append("clipPath")
+			.attr("id", "clip")
+			.append("rect")
+				.attr("width", this.graphWidth)
+				.attr("height", this.graphHeight);
+
+		this.area = this.svg.append("path")
+			.attr("class", "area")
+			.attr("clip-path", "url(#clip)")
+			.attr("fill", "#4682B4");
 
 		this.xAxisGroup = this.svg.append("g")
 			.attr("class", "x axis")
@@ -74,6 +94,7 @@ LineGraph.prototype = {
 			points = this.svg.selectAll(".point")
 				.data(this.state);
 
+		// update
 		points
 			.transition()
 			.attr("cx", function(d){
@@ -83,6 +104,7 @@ LineGraph.prototype = {
 				return self.y(self.yAccessor(d));
 			});
 
+		// enter
 		points
 			.enter().append("svg:circle")
 			.attr("class", "point")			
@@ -93,7 +115,8 @@ LineGraph.prototype = {
 			.attr("cy", function(d){
 				return self.y(self.yAccessor(d));
 			});
-
+		
+		// exit		
 		points.exit().remove();
 	},
 	xAccessor: function(d){
@@ -132,6 +155,10 @@ LineGraph.prototype = {
 			.datum(this.state)
 			.transition()
 			.attr("d", this.line);
+
+		this.area
+			.transition()
+			.attr("d", this.areaGenerator(this.state));
 
 		this.drawPoints();
 

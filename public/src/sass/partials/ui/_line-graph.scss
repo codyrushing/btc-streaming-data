@@ -1,0 +1,27 @@
+.line-graph {
+
+	$graph-blue: #4682B4;
+
+	.axis path,
+	.axis line {
+	  fill: none;
+	  stroke: #ccc;
+	  shape-rendering: crispEdges;
+	}
+	text {
+		fill: #ccc;
+	}
+	.line {
+	  fill: none;
+	  stroke: $graph-blue;
+	  stroke-width: 1.5px;
+	}
+	.point {
+		fill: $graph-blue;
+	}
+	.area {
+		fill: $graph-blue;
+		opacity: 0.5;
+	}	
+
+}

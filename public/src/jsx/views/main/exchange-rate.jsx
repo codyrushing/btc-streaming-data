@@ -19,7 +19,8 @@ var ExchangeRateView = React.createClass({
 			this.chartContainer,
 			{
 				width: 800,
-				height: 500
+				height: 500,
+				name: "exchange-rate"
 			},
 			this.state.entries
 		);

@@ -19,7 +19,7 @@ var loop = function(){
 module.exports = function(name, dispatcher, io){
 	return new IntervalRoom(dispatcher, io, {
 		name: name,
-		interval: 10 * 1000,
+		interval: 30 * 1000,
 		cacheInterval: 60 * 1000 * 15,
 		on_activeLoop: loop,
 		on_emptyLoop: loop
