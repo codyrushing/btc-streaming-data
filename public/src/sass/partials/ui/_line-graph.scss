@@ -24,4 +24,8 @@
 		opacity: 0.5;
 	}	
 
+	.tick line {
+		stroke: $graph-blue;
+	}
+
 }

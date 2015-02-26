@@ -504,5 +504,7 @@ main.home {
 .line-graph .area {
   fill: #4682B4;
   opacity: 0.5; }
+.line-graph .tick line {
+  stroke: #4682B4; }
 
 /*# sourceMappingURL=style.css.map */

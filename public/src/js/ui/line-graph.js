@@ -24,6 +24,8 @@ LineGraph.prototype = {
 
 		this.xAxis = d3.svg.axis()
 			.scale(this.x)
+			.tickSize(-this.graphHeight)
+			.tickSubdivide(true)
 		    .orient("bottom");
 
 		this.yAxis = d3.svg.axis()
@@ -31,7 +33,7 @@ LineGraph.prototype = {
 		    .ticks(10)
 		    .orient("left");
 		
-		this.line = d3.svg.line()
+		this.lineGenerator = d3.svg.line()
 			// control the curve of the line here
 		    .interpolate(lineInterpolation)
 		    .x(function(d) { 
@@ -43,9 +45,23 @@ LineGraph.prototype = {
 
 		this.areaGenerator = d3.svg.area()
 			.interpolate(lineInterpolation)
-			.x(this.xAccessor)
+			.x(function(d){
+				return this.x(this.xAccessor(d));
+			}.bind(this))
 			.y0(this.graphHeight)
-			.y1(this.yAccessor);
+			.y1(function(d){
+				return this.y(this.yAccessor(d));
+			}.bind(this));
+
+		this.tickClipAreaGenerator = d3.svg.area()
+			.interpolate(lineInterpolation)
+			.x(function(d){
+				return this.x(this.xAccessor(d));
+			}.bind(this))
+			.y1(function(d){
+				return this.y(this.yAccessor(d));
+			}.bind(this))
+			.y0(0);
 
 		this.buildDOM();
 	},
@@ -67,6 +83,11 @@ LineGraph.prototype = {
 				.attr("width", this.graphWidth)
 				.attr("height", this.graphHeight);
 
+		this.tickClipPath = this.svg.append("clipPath")
+			.attr("id", "tick-clip")
+			.append("path")
+			.attr("fill", "#ff0000");
+
 		this.area = this.svg.append("path")
 			.attr("class", "area")
 			.attr("clip-path", "url(#clip)")
@@ -77,7 +98,7 @@ LineGraph.prototype = {
 			.attr("transform", "translate(0," + this.graphHeight + ")");
 
 		this.yAxisGroup = this.svg.append("g")
-			.attr("class", "y axis");
+			.attr("class", "y axis");		
 
 		// this.yAxisLabel = this.yAxisGroup.append("text")
 		// 	.attr("class", "label")
@@ -108,7 +129,7 @@ LineGraph.prototype = {
 		points
 			.enter().append("svg:circle")
 			.attr("class", "point")			
-			.attr("r", 3)			
+			.attr("r", 5)			
 			.attr("cx", function(d){
 				return self.x(self.xAccessor(d));
 			})
@@ -151,10 +172,19 @@ LineGraph.prototype = {
 		this.yAxisGroup
 			.call(this.yAxis);
 
+		// change the tick clip path
+		this.tickClipPath
+			.transition()
+			.attr("d", this.tickClipAreaGenerator(this.state));
+
+		// add the "clip-path" attr to all ticks
+		this.xAxisGroup.selectAll(".tick line")
+			.attr("clip-path", "url(#tick-clip)")
+
 		this.linePath
 			.datum(this.state)
 			.transition()
-			.attr("d", this.line);
+			.attr("d", this.lineGenerator);
 
 		this.area
 			.transition()
