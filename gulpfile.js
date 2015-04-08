@@ -9,7 +9,7 @@ var gulp = require("gulp"),
 	jshint = require("gulp-jshint"),
 	// version of libsass used by gulp-sass is incompatible with susy, so we use gulp-ruby-sass
 	sass = require("gulp-ruby-sass"),
-	sassSourcemaps = require("gulp-sourcemaps"),
+	sourcemaps = require("gulp-sourcemaps"),
 	path = require("path");
 	paths = {
 		src: {
@@ -49,7 +49,7 @@ gulp.task("jshint", function(){
 });
 
 gulp.task("browserify", function(){
-	return gulp.src(paths.src.js + "app.js")
+	return gulp.src(paths.src.js + "app.js")		
 		.pipe(plumber())
 		.pipe(browserify({
 			debug: true

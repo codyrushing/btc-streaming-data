@@ -1,20 +1,27 @@
-var d3 = require("d3");
+// https://stackoverflow.com/questions/11503151/in-d3-how-to-get-the-interpolated-line-data-from-a-svg-line
 
-var LineGraph = function(el, props, state){
+var d3 = require("d3"),
+	_ = require("lodash");
+
+var LineGraph = function(el, props, data){
 	this.el = el;
-	this.props = props;
-	this.state = state;
+	this.props = _.defaults(props, {
+		targetDataLength: 10
+	});
+	this.data = data || [];
 	this.init();
 };
 
 LineGraph.prototype = {
 	init: function(){
-		var self = this;
-			lineInterpolation = "linear";
+		var self = this,
+			lineInterpolation = "cardinal";
 
 		this.margin = {top: 20, right: 20, bottom: 30, left: 50};
 		this.graphWidth = this.props.width - this.margin.left - this.margin.right,
 		this.graphHeight = this.props.height - this.margin.top - this.margin.bottom;
+
+		this.translateLeft = 0;
 
 		this.x = d3.time.scale()
 			.range([0, this.graphWidth]);
@@ -30,7 +37,7 @@ LineGraph.prototype = {
 
 		this.yAxis = d3.svg.axis()
 		    .scale(this.y)
-		    .ticks(10)
+		    .ticks(5)
 		    .orient("left");
 		
 		this.lineGenerator = d3.svg.line()
@@ -53,15 +60,10 @@ LineGraph.prototype = {
 				return this.y(this.yAccessor(d));
 			}.bind(this));
 
-		this.tickClipAreaGenerator = d3.svg.area()
-			.interpolate(lineInterpolation)
-			.x(function(d){
-				return this.x(this.xAccessor(d));
-			}.bind(this))
-			.y1(function(d){
-				return this.y(this.yAccessor(d));
-			}.bind(this))
-			.y0(0);
+		this.transition = d3.select({})
+			.transition()
+			.duration(750)
+			.ease("linear");
 
 		this.buildDOM();
 	},
@@ -74,31 +76,37 @@ LineGraph.prototype = {
 			.append("g")
 			.attr("transform", "translate(" + this.margin.left + "," + this.margin.top + ")");
 
-		this.linePath = this.svg.append("path")
-			.attr("class", "line");
-
-		this.clipPath = this.svg.append("clipPath")
-			.attr("id", "clip")
-			.append("rect")
-				.attr("width", this.graphWidth)
-				.attr("height", this.graphHeight);
-
-		this.tickClipPath = this.svg.append("clipPath")
-			.attr("id", "tick-clip")
-			.append("path")
-			.attr("fill", "#ff0000");
-
-		this.area = this.svg.append("path")
-			.attr("class", "area")
-			.attr("clip-path", "url(#clip)")
-			.attr("fill", "#4682B4");
+		this.clipPath = this.svg
+			.append("defs")
+				.append("clipPath")
+				.attr("id", "clip")
+				.append("rect")
+					.attr("width", this.graphWidth)
+					.attr("height", this.graphHeight);
 
 		this.xAxisGroup = this.svg.append("g")
 			.attr("class", "x axis")
 			.attr("transform", "translate(0," + this.graphHeight + ")");
 
 		this.yAxisGroup = this.svg.append("g")
-			.attr("class", "y axis");		
+			.attr("class", "y axis");
+
+		this.mainGroup = this.svg.append("g")
+			.attr("clip-path", "url(#clip)");
+
+		this.linePath = this.mainGroup
+			.append("path")
+			.attr("class", "line");
+
+		this.area = this.mainGroup
+			.append("path")
+			.attr("class", "area")
+			.attr("id", "main-area")
+			.attr("fill", "#4682B4");
+
+		this.dotGroup = this.mainGroup
+			.append("g")
+			.attr("class", "dot-group");
 
 		// this.yAxisLabel = this.yAxisGroup.append("text")
 		// 	.attr("class", "label")
@@ -112,8 +120,8 @@ LineGraph.prototype = {
 	},
 	drawPoints: function(){
 		var self = this,
-			points = this.svg.selectAll(".point")
-				.data(this.state);
+			points = this.dotGroup.selectAll(".point")
+				.data(this.data);
 
 		// update
 		points
@@ -129,7 +137,7 @@ LineGraph.prototype = {
 		points
 			.enter().append("svg:circle")
 			.attr("class", "point")			
-			.attr("r", 5)			
+			.attr("r", 2)			
 			.attr("cx", function(d){
 				return self.x(self.xAccessor(d));
 			})
@@ -146,19 +154,35 @@ LineGraph.prototype = {
 	yAccessor: function(d){
 		return d.USD.last;
 	},
-	update: function(state){
-		/* SET DOMAINS */
-		var yMin, yMax;
+	// not using this yet
+	findYatX: function(x, line){
+		var getXY = function(len){
+			var point = line.getPointAtLength(len);
+			return [point.x, point.y];
+		};
 
-		if(state){
-			this.state = state;
+		var curLen = 0;
+		while(getXY(curLen)[0] < x){
+			curLen += 0.1;
 		}
+		return getXY(curLen);
+	},
 
-		yMin = d3.min(this.state, this.yAccessor);
-		yMax = d3.max(this.state, this.yAccessor);
+	getSegmentWidth: function(i){
+		return this.x(this.xAccessor(this.data[i+1])) - this.x(this.xAccessor(this.data[i]));
+	},
+
+	update: function(newData){
+		var yMin, yMax,
+			leadingDataToPrune = 0,
+			dataOverflow = 0;
+
+		/* SET DOMAINS */
+		yMin = d3.min(this.data, this.yAccessor);
+		yMax = d3.max(this.data, this.yAccessor);
   		
   		this.x
-  			.domain(d3.extent(this.state, this.xAccessor));
+  			.domain(d3.extent(this.data, this.xAccessor));
 
 		this.y
   			.domain([
@@ -172,25 +196,48 @@ LineGraph.prototype = {
 		this.yAxisGroup
 			.call(this.yAxis);
 
-		// change the tick clip path
-		this.tickClipPath
-			.transition()
-			.attr("d", this.tickClipAreaGenerator(this.state));
-
-		// add the "clip-path" attr to all ticks
-		this.xAxisGroup.selectAll(".tick line")
-			.attr("clip-path", "url(#tick-clip)")
+		if(newData){
+			this.data = newData;
+			dataOverflow = this.data.length - this.props.maxData;
+		}
 
 		this.linePath
-			.datum(this.state)
-			.transition()
-			.attr("d", this.lineGenerator);
+			.attr("d", this.lineGenerator(this.data));
 
 		this.area
-			.transition()
-			.attr("d", this.areaGenerator(this.state));
+			.attr("d", this.areaGenerator(this.data));
+
+		// this.xAxisGroup.selectAll(".tick").each(function(d, i){
+		// 	var x = this.x(d);
+		// 	console.log(this.linePath.node().getPointAtLength(100));
+		// }.bind(this));
+
+		//this.xAxisGroup.selectAll(".tick line")
 
 		this.drawPoints();
+
+		// if we have too many data points
+		if(dataOverflow > 0) {
+
+			// horizontal distance that we are going to translate
+			this.translateLeft = this.getSegmentWidth(this.data.length-2);
+
+			// compare this.translateLeft to leadingSegmentWidth
+			while(this.translateLeft > this.getSegmentWidth(leadingDataToPrune)){
+				leadingDataToPrune++;
+			}
+
+			this.mainGroup
+				.transition()
+				.ease("linear")
+				.each("end", function(d, i){
+					if(leadingDataToPrune){
+						this.props.dispatcher.emit("prune", leadingDataToPrune);
+					}
+				}.bind(this))
+				.attr("transform", "translate(" + this.translateLeft*-1 + ")");
+
+		}
 
 	}
 };

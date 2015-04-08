@@ -38,12 +38,11 @@ RoomCache.prototype = {
 			});
 		}
 	},
-
 	prune: function(){
 		var self = this,
 			pruneRange = function(range){
 				this.getDBCursorForRange(range, function(){
-
+					// TODO, do something here... no actual pruning is happening					
 				});
 			};
 
