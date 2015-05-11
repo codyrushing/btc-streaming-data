@@ -1,26 +1,24 @@
 var gulp = require("gulp"),
-	gulpif = require("gulp-if"),
 	changed = require("gulp-changed"),
 	runSequence = require("run-sequence"),
 	nodemon = require("gulp-nodemon"),
 	plumber = require("gulp-plumber"),
-	react = require("gulp-react"),
-	browserify = require("gulp-browserify"),
+	browserify = require("browserify"),
 	jshint = require("gulp-jshint"),
+	reactify = require("reactify"),
+	source = require("vinyl-source-stream"),
 	// version of libsass used by gulp-sass is incompatible with susy, so we use gulp-ruby-sass
 	sass = require("gulp-ruby-sass"),
 	sourcemaps = require("gulp-sourcemaps"),
 	path = require("path");
 	paths = {
 		src: {
-			js: "public/src/js/",
-			views: "public/src/jsx/views/",
+			app: "public/src/app/",
 			sass: "public/src/sass/"
 		},
-		dest: {
-			js: "public/js/",
-			views: "public/src/js/views/",
-			css: "public/css/"
+		dist: {
+			js: "public/dist/js/",
+			css: "public/dist/css/"
 		}
 	},
 	nodeArgs = process.argv.filter(function(arg){
@@ -29,10 +27,10 @@ var gulp = require("gulp"),
 
 // precompile all jsx -> js
 gulp.task("react", function(){
-	return gulp.src(paths.src.views + "**/*.jsx")
+	return gulp.src(paths.src.app + "**/*.jsx")
 		.pipe(plumber())
 		.pipe(react())
-		.pipe( gulp.dest(paths.dest.views) );
+		.pipe( gulp.dest(paths.dest.js) );
 });
 
 gulp.task("scripts", /*["jshint"],*/ function(){
@@ -45,11 +43,11 @@ gulp.task("jshint", function(){
 		.pipe(changed("./"))
 		.pipe(plumber())
 		.pipe(jshint())
-		.pipe(jshint.reporter("jshint-stylish"));	
+		.pipe(jshint.reporter("jshint-stylish"));
 });
 
 gulp.task("browserify", function(){
-	return gulp.src(paths.src.js + "app.js")		
+	return gulp.src(paths.src.js + "app.js")
 		.pipe(plumber())
 		.pipe(browserify({
 			debug: true
@@ -57,8 +55,18 @@ gulp.task("browserify", function(){
 		.pipe( gulp.dest( paths.dest.js ) );
 });
 
+gulp.task("reactify", function(){
+	var b = browserify();
+	b.transform(reactify);
+	b.add(paths.src.app + "app.js");
+
+	return b.bundle()
+		.pipe(source("app.js"))
+		.pipe(gulp.dest(paths.dist.js));
+})
+
 /*
-* YOU MUST ADD 
+* YOU MUST ADD
 ==============
 
 ulimit -n 2560
@@ -72,19 +80,19 @@ gulp.task("server", function(){
 
 	require("child_process").exec("mongod --noauth");
 
-	r = nodemon({	
+	r = nodemon({
 		script: "app.js",
 		ext: "js",
 		nodeArgs: nodeArgs,
 		ignore: ["public/", "gulpfile.js"]
 	});
 
-	if(nodeArgs.length){		
+	if(nodeArgs.length){
 		require("child_process").spawn("node-inspector");
 		require("child_process").spawn("open", ["http://localhost:8080/debug?port=5858"]);
 	}
 
-	require("child_process").spawn("open", ["http://localhost:3003/"]);
+	//require("child_process").spawn("open", ["http://localhost:3003/"]);
 
 	return r;
 
@@ -100,8 +108,8 @@ gulp.task("sass", function(){
 });
 
 gulp.task("watch", function(){
-	gulp.watch([paths.src.views + "**/*.jsx"], ["react"]);
-	gulp.watch([paths.src.js + "**/*.js", "!gulpfile.js"], ["scripts"]);
+	gulp.watch([paths.src.app + "**/*.{js,jsx}"], ["reactify"]);
+	//gulp.watch([paths.src.js + "**/*.js", "!gulpfile.js"], ["scripts"]);
 	gulp.watch([paths.src.sass + "**/*.scss"], ["sass"]);
 	gulp.watch(["gulpfile.js"], ["dev"]);
 });
