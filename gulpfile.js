@@ -66,6 +66,7 @@ gulp.task("reactify", function(){
 	b.add(paths.src.app + "app.js");
 
 	return b.bundle()
+		.pipe(plumber())
 		.pipe(source("app.js"))
 		.pipe(gulp.dest(paths.dist.js));
 })

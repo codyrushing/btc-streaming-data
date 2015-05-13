@@ -30360,7 +30360,8 @@ module.exports = routes;
 
 
 },{"./views/main/dashboard":249,"./views/main/not-found":250,"./views/page":251,"react":196,"react-router":27}],248:[function(require,module,exports){
-var React = require("react");
+var React = require("react"),
+	Link = require("react-router").Link;
 
 var TopNav = React.createClass({displayName: "TopNav",
 	render: function(){
@@ -30372,9 +30373,8 @@ var TopNav = React.createClass({displayName: "TopNav",
 		},
 		nav = Object.keys(navItems).map(function(route){
 			var title = navItems[route];
-			var className = this.props.currentRoute === route ? "active" : "";
 			return (
-				React.createElement("a", {href: route, title: title, className: className}, title)
+				React.createElement(Link, {to: route, title: title}, title)
 			);
 		}, this);
 
@@ -30388,7 +30388,8 @@ var TopNav = React.createClass({displayName: "TopNav",
 
 module.exports = TopNav;
 
-},{"react":196}],249:[function(require,module,exports){
+
+},{"react":196,"react-router":27}],249:[function(require,module,exports){
 var React = require("react");
 
 var DashboardView = React.createClass({displayName: "DashboardView",
@@ -30444,6 +30445,7 @@ var PageView = React.createClass({displayName: "PageView",
   	},
   	*/
   	render: function() {
+
 		return (
 			React.createElement("div", null, 
 				React.createElement("section", {className: "wrapper"}, 
@@ -30451,7 +30453,7 @@ var PageView = React.createClass({displayName: "PageView",
 						React.createElement("a", {id: "logo", href: "/"}, 
 							"Blockchain", React.createElement("span", {className: "highlight"}, " Realtime")
 						), 
-						React.createElement(TopNav, {currentRoute: this.state.currentRoute})
+						React.createElement(TopNav, null)
 					), 
 
 					React.createElement(Router.RouteHandler, null), 
@@ -30459,7 +30461,7 @@ var PageView = React.createClass({displayName: "PageView",
 					React.createElement("footer", null, 
 						React.createElement("nav", null, 
 							React.createElement("a", {href: "https://github.com/codyrushing/btc-streaming-data", target: "_blank"}, "Github")
-						)					
+						)
 					)
 				)
 
@@ -30498,7 +30500,7 @@ var app = {
 	},
 	domReady: function(){
 
-		Router.run(routes, function(Handler){
+		Router.run(routes, Router.HistoryLocation, function(Handler){
 			/* <Handler /> doesn't get jsx transcoded properly, or maybe there's something wrong with gulp, hard to say */
 			React.render(React.createElement(Handler, null),document.body);
 		});

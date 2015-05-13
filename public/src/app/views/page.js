@@ -27,6 +27,7 @@ var PageView = React.createClass({
   	},
   	*/
   	render: function() {
+
 		return (
 			<div>
 				<section className="wrapper">
@@ -34,7 +35,7 @@ var PageView = React.createClass({
 						<a id="logo" href="/">
 							Blockchain<span className="highlight">&nbsp;Realtime</span>
 						</a>
-						<TopNav currentRoute={this.state.currentRoute} />
+						<TopNav />
 					</header>
 
 					<Router.RouteHandler />
@@ -42,7 +43,7 @@ var PageView = React.createClass({
 					<footer>
 						<nav>
 							<a href="https://github.com/codyrushing/btc-streaming-data" target="_blank">Github</a>
-						</nav>					
+						</nav>
 					</footer>
 				</section>
 

@@ -1,4 +1,5 @@
-var React = require("react");
+var React = require("react"),
+	Link = require("react-router").Link;
 
 var TopNav = React.createClass({
 	render: function(){
@@ -10,9 +11,8 @@ var TopNav = React.createClass({
 		},
 		nav = Object.keys(navItems).map(function(route){
 			var title = navItems[route];
-			var className = this.props.currentRoute === route ? "active" : "";
 			return (
-				<a href={route} title={title} className={className}>{title}</a>
+				<Link to={route} title={title}>{title}</Link>
 			);
 		}, this);
 
