@@ -10,7 +10,7 @@ $susy: (
 
 // VENDOR
 @import "normalize-scss/normalize";
-@import "susy";
+@import "susy/sass/susy";
 
 @import "partials/base";
 @import "partials/global";

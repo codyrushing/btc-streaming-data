@@ -27,4 +27,7 @@ node_modules
 # Bower
 bower_components/
 
+# Built assets
+public/dist
+
 .sass-cache/

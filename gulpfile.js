@@ -11,26 +11,31 @@ var gulp = require("gulp"),
 	sass = require("gulp-ruby-sass"),
 	sourcemaps = require("gulp-sourcemaps"),
 	path = require("path");
-	paths = {
-		src: {
-			app: "public/src/app/",
-			sass: "public/src/sass/"
+
+	var srcBase = "public/src/",
+		distBase = "public/dist/",
+		paths = {
+			src: {
+				app: srcBase + "app/",
+				img: srcBase + "images/",
+				sass: srcBase + "sass/"
+			},
+			dist: {
+				js: distBase + "js/",
+				img: distBase + "images/",
+				css: distBase + "css/"
+			}
 		},
-		dist: {
-			js: "public/dist/js/",
-			css: "public/dist/css/"
-		}
-	},
-	nodeArgs = process.argv.filter(function(arg){
-		return arg.indexOf("--") === 0;
-	});
+		nodeArgs = process.argv.filter(function(arg){
+			return arg.indexOf("--") === 0;
+		});
 
 // precompile all jsx -> js
 gulp.task("react", function(){
 	return gulp.src(paths.src.app + "**/*.jsx")
 		.pipe(plumber())
 		.pipe(react())
-		.pipe( gulp.dest(paths.dest.js) );
+		.pipe( gulp.dest(paths.dist.js) );
 });
 
 gulp.task("scripts", /*["jshint"],*/ function(){
@@ -39,7 +44,7 @@ gulp.task("scripts", /*["jshint"],*/ function(){
 
 gulp.task("jshint", function(){
 	// jshint all js
-	return gulp.src("**/*.js", "!"+paths.dest.js, "!node_modules/")
+	return gulp.src("**/*.js", "!"+paths.dist.js, "!node_modules/")
 		.pipe(changed("./"))
 		.pipe(plumber())
 		.pipe(jshint())
@@ -52,7 +57,7 @@ gulp.task("browserify", function(){
 		.pipe(browserify({
 			debug: true
 		}))
-		.pipe( gulp.dest( paths.dest.js ) );
+		.pipe( gulp.dest( paths.dist.js ) );
 });
 
 gulp.task("reactify", function(){
@@ -98,13 +103,24 @@ gulp.task("server", function(){
 
 });
 
-gulp.task("sass", function(){
-	gulp.src(paths.src.sass + "*.scss")
+gulp.task("img", function(){
+
+	return gulp.src([paths.src.img + "**/*.{png,jpg,gif,svg}"])
 		.pipe(plumber())
-		.pipe(
-			sass({loadPath: ["bower_components"], require: "susy"})
-		)
-		.pipe(gulp.dest( paths.dest.css ));
+		.pipe(gulp.dest(paths.dist.img));
+});
+
+gulp.task("sass", function(){
+
+		sass(paths.src.sass,{
+			sourcemap: true,
+			loadPath: ["bower_components"]
+		})
+		.on("error", function(err){
+			console.log("* Sass Error *\nerr.message")
+		})
+		.pipe(sourcemaps.write())
+		.pipe(gulp.dest( paths.dist.css ));
 });
 
 gulp.task("watch", function(){
@@ -114,4 +130,4 @@ gulp.task("watch", function(){
 	gulp.watch(["gulpfile.js"], ["dev"]);
 });
 
-gulp.task("dev", ["server", "react", "scripts", "sass", "watch"]);
+gulp.task("dev", ["server", "img", "reactify", "sass", "watch"]);

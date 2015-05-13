@@ -24,7 +24,7 @@ var app = {
 	},
 	domReady: function(){
 
-		Router.run(routes, function(Handler){
+		Router.run(routes, Router.HistoryLocation, function(Handler){
 			/* <Handler /> doesn't get jsx transcoded properly, or maybe there's something wrong with gulp, hard to say */
 			React.render(React.createElement(Handler, null),document.body);
 		});
