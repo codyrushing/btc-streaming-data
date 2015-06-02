@@ -1,24 +1,35 @@
 var React = require("react"),
+	_ = require("lodash"),
+	constants = require("../../constants"),
 	LineGraph = require("../../ui/line-graph"),
-	RoomListener = require("../../base/RoomListener"),
-	_ = require("lodash");
+	AppDispatcher = require("../../dispatcher"),
+	ExchangeRateStore = require("../../stores/ExchangeRateStore"),
+	ExchangeRateActions = require("../../actions/ExchangeRateActions");
 
 var ExchangeRateView = React.createClass({
 	getDefaultProps: function(){
 		return {
-			maxData: 10,
+			maxData: 10
 		};
 	},
 	componentWillMount: function(){
-		this.props.dispatcher.on("data", this._onData.bind(this));
-		this.props.dispatcher.on("data", this._onPrune.bind(this));
-		this.roomListener = new RoomListener(this.props.socket, this.props.dispatcher, {
-			room: "exchange-rate"
-		});
+		// flux way
+		ExchangeRateActions.subscribe();
+		ExchangeRateStore.on("change", this._onData.bind(this));
+
+		// old way
+		// this.props.dispatcher.on("data", this._onData.bind(this));
+		// this.props.dispatcher.on("data", this._onPrune.bind(this));
+		// this.roomListener = new RoomListener(this.props.socket, this.props.dispatcher, {
+		// 	room: "exchange-rate"
+		// });
 	},
 	componentWillUnmount: function(){
-		this.props.dispatcher.off("data", this._ondata.bind(this));
-		this.roomListener.exit();
+		ExchangeRateActions.unsubscribe();
+
+		// old way
+		// this.props.dispatcher.off("data", this._ondata.bind(this));
+		// this.roomListener.exit();
 	},
 	componentDidMount: function(){
 		this.chartContainer = this.getDOMNode().querySelectorAll(".chart-container")[0];
@@ -47,24 +58,16 @@ var ExchangeRateView = React.createClass({
 
 		// 	this.setState({
 		// 		entries: entries.slice(dataOverflow, entries.length)
-		// 	});			
+		// 	});
 		// }
 	},
 	shouldComponentUpdate: function(nextProps, nextState){
 		// if we are reducing data, do not update
 		return nextState.entries.length >= this.state.entries.length;
 	},
-	_onData: function(data){
-		var entries = _.clone(this.state.entries);
-		entries.push(data);
-
+	_onData: function(){
 		this.setState({
-			entries: entries
-		});
-	},
-	_onPrune: function(index){
-		this.setState({
-			entries: this.state.entries.slice(index, this.state.entries.length)
+			entries: ExchangeRateStore.getAll()
 		});
 	},
 	getInitialState: function(){

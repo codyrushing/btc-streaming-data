@@ -1,5 +1,5 @@
 // https://stackoverflow.com/questions/11503151/in-d3-how-to-get-the-interpolated-line-data-from-a-svg-line
-
+// http://bost.ocks.org/mike/path/
 var d3 = require("d3"),
 	_ = require("lodash");
 
@@ -15,7 +15,7 @@ var LineGraph = function(el, props, data){
 LineGraph.prototype = {
 	init: function(){
 		var self = this,
-			lineInterpolation = "cardinal";
+			lineInterpolation = "linear";
 
 		this.margin = {top: 20, right: 20, bottom: 30, left: 50};
 		this.graphWidth = this.props.width - this.margin.left - this.margin.right,
@@ -25,7 +25,7 @@ LineGraph.prototype = {
 
 		this.x = d3.time.scale()
 			.range([0, this.graphWidth]);
-		
+
 		this.y = d3.scale.linear()
 			.range([this.graphHeight, 0]);
 
@@ -39,14 +39,14 @@ LineGraph.prototype = {
 		    .scale(this.y)
 		    .ticks(5)
 		    .orient("left");
-		
+
 		this.lineGenerator = d3.svg.line()
 			// control the curve of the line here
 		    .interpolate(lineInterpolation)
-		    .x(function(d) { 
+		    .x(function(d) {
 		    	return this.x(this.xAccessor(d));
 		    }.bind(this))
-		    .y(function(d) { 
+		    .y(function(d) {
 		    	return this.y(this.yAccessor(d));
 		    }.bind(this));
 
@@ -136,16 +136,16 @@ LineGraph.prototype = {
 		// enter
 		points
 			.enter().append("svg:circle")
-			.attr("class", "point")			
-			.attr("r", 2)			
+			.attr("class", "point")
+			.attr("r", 2)
 			.attr("cx", function(d){
 				return self.x(self.xAccessor(d));
 			})
 			.attr("cy", function(d){
 				return self.y(self.yAccessor(d));
 			});
-		
-		// exit		
+
+		// exit
 		points.exit().remove();
 	},
 	xAccessor: function(d){
@@ -168,8 +168,15 @@ LineGraph.prototype = {
 		return getXY(curLen);
 	},
 
-	getSegmentWidth: function(i){
-		return this.x(this.xAccessor(this.data[i+1])) - this.x(this.xAccessor(this.data[i]));
+	getSegmentWidth: function(i1,i2){
+		return this.x(this.xAccessor(this.data[i2])) - this.x(this.xAccessor(this.data[i1]));
+	},
+
+	removeStaleData: function(startingIndex){
+		startingIndex = typeof startingIndex === "undefined"
+			? this.data.length - this.props.targetDataLength
+			: startingIndex;
+		this.data = this.data.slice(startingIndex, this.data.length);
 	},
 
 	update: function(newData){
@@ -180,7 +187,7 @@ LineGraph.prototype = {
 		/* SET DOMAINS */
 		yMin = d3.min(this.data, this.yAccessor);
 		yMax = d3.max(this.data, this.yAccessor);
-  		
+
   		this.x
   			.domain(d3.extent(this.data, this.xAccessor));
 
@@ -219,8 +226,8 @@ LineGraph.prototype = {
 		// if we have too many data points
 		if(dataOverflow > 0) {
 
-			// horizontal distance that we are going to translate
-			this.translateLeft = this.getSegmentWidth(this.data.length-2);
+			// horizontal distance that we are going to translate (the distance of the latest point)
+			this.translateLeft = this.getSegmentWidth(this.data.length-2, this.data.length-1);
 
 			// compare this.translateLeft to leadingSegmentWidth
 			while(this.translateLeft > this.getSegmentWidth(leadingDataToPrune)){
@@ -232,7 +239,7 @@ LineGraph.prototype = {
 				.ease("linear")
 				.each("end", function(d, i){
 					if(leadingDataToPrune){
-						this.props.dispatcher.emit("prune", leadingDataToPrune);
+						this.removeStaleData(leadingDataToPrune);
 					}
 				}.bind(this))
 				.attr("transform", "translate(" + this.translateLeft*-1 + ")");

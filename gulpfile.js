@@ -61,7 +61,9 @@ gulp.task("browserify", function(){
 });
 
 gulp.task("reactify", function(){
-	var b = browserify();
+	var b = browserify({
+		debug: true
+	});
 	b.transform(reactify);
 	b.add(paths.src.app + "app.js");
 
@@ -69,7 +71,7 @@ gulp.task("reactify", function(){
 		.pipe(plumber())
 		.pipe(source("app.js"))
 		.pipe(gulp.dest(paths.dist.js));
-})
+});
 
 /*
 * YOU MUST ADD

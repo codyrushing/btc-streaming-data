@@ -4,7 +4,6 @@ var _ = require("lodash"),
 
 var RoomCacheReducer = function(options){
 	this.options = _.defaults(options, {});
-
 	this.init();
 };
 
@@ -20,7 +19,7 @@ RoomCacheReducer.prototype = {
 			},
 			end: function(){
 				return new Date(new Date().getTime());
-			}				
+			}
 		},
 		lastDay: {
 			field: "date",
@@ -30,7 +29,7 @@ RoomCacheReducer.prototype = {
 			},
 			end: function(){
 				return new Date(new Date().getTime());
-			}				
+			}
 		},
 		last7Days: {
 			field: "date",
@@ -40,7 +39,7 @@ RoomCacheReducer.prototype = {
 			},
 			end: function(){
 				return new Date(new Date().getTime());
-			}				
+			}
 		},
 		last30Days: {
 			field: "date",
@@ -83,7 +82,7 @@ RoomCacheReducer.prototype = {
 					var dbStream = cursor.stream(),
 						dest = new SocketStream(this.options.roomName, this.options.rangeName, this.options.socket);
 
-					// TODO make this more elegant	
+					// TODO make this more elegant
 					if(dbStream && (err || !minValue || !maxValue) ){
 						// if we got the data back, but there wasn't enough of to necessitate a cacheReducer, just pipe it to the socket
 						dbStream.pipe(dest);
@@ -113,7 +112,7 @@ RoomCacheReducer.prototype = {
 		return this.options.collection.find( this.getRangeQuery(range) );
 	},
 	/*
-	this function determines the data min and max values for a given range, 
+	this function determines the data min and max values for a given range,
 	which along with the cursor object, are passed along to finalCallback
 	finalCallback(err, cursor, minValue, maxValue)
 	*/
@@ -133,7 +132,7 @@ RoomCacheReducer.prototype = {
 				if(count && range.size && count > range.size){
 					ascSort = {};
 					ascSort[range.field] = 1;
-					
+
 					cursor.sort(ascSort).limit(3).toArray(function(err, items){
 						cb(err, this.getDBCursorForRange(range), items.length ? items[0][range.field] : null);
 					}.bind(this));
@@ -153,7 +152,7 @@ RoomCacheReducer.prototype = {
 			}.bind(this),
 		], finalCallback);
 	},
-	/* 
+	/*
 	* takes a mongodb cursor and returns a stream of the median values
 	*/
 	getMedianStream: function(err, cursor, range, minValue, maxValue){

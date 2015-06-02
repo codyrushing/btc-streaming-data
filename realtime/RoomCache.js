@@ -7,7 +7,6 @@ var RoomCache = function(dispatcher, db, options){
 	this.options = _.defaults(options, {});
 
 	this.init();
-
 };
 
 RoomCache.prototype = {
@@ -31,8 +30,8 @@ RoomCache.prototype = {
 	on_join: function(data, socket){
 		if(data.cacheRange){
 			new RoomCacheReducer({
-				collection: this.collection, 
-				rangeName: data.cacheRange, 
+				collection: this.collection,
+				rangeName: data.cacheRange,
 				roomName: this.options.name,
 				socket: socket
 			});
@@ -42,7 +41,7 @@ RoomCache.prototype = {
 		var self = this,
 			pruneRange = function(range){
 				this.getDBCursorForRange(range, function(){
-					// TODO, do something here... no actual pruning is happening					
+					// TODO, do something here... no actual pruning is happening
 				});
 			};
 

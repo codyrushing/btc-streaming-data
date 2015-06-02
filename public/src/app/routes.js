@@ -5,7 +5,7 @@ var React = require("react"),
 	NotFoundRoute = Router.NotFoundRoute;
 
 var Page = require("./views/page"),
-	ExchangeRateView = require("./views/main/dashboard"),
+	ExchangeRateView = require("./views/main/exchange-rate"),
 	DashboardView = require("./views/main/dashboard"),
 	NotFoundView = require("./views/main/not-found");
 

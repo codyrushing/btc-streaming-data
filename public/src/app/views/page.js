@@ -5,27 +5,8 @@ var Router = require("react-router");
 
 var PageView = React.createClass({
 	contextTypes: {
-		router: React.PropTypes.func
+		router: React.PropTypes.func // router gets passed in directly
 	},
-	/*
-	componentWillMount : function() {
-		this.props.dispatcher.on("route", this.onroute, this);
-	},
-	componentWillUnmount : function() {
-    	this.props.dispatcher.off("route", this.onroute, this);
-  	},
-  	// Backbone Router will emit "route" events to dispatcher on route change
-	onroute: function(route){
-		this.setState({
-			currentRoute: route
-		});
-	},
-  	getInitialState: function(){
-  		return {
-  			currentRoute: "/"
-  		};
-  	},
-  	*/
   	render: function() {
 
 		return (
