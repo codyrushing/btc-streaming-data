@@ -1,12 +1,12 @@
-// https://stackoverflow.com/questions/11503151/in-d3-how-to-get-the-interpolated-line-data-from-a-svg-line
-// http://bost.ocks.org/mike/path/
+// http://bl.ocks.org/mbostock/4015254
+// http://computationallyendowed.com/blog/2013/01/21/bounded-panning-in-d3.html
 var d3 = require("d3"),
 	_ = require("lodash");
 
 var LineGraph = function(el, props, data){
 	this.el = el;
 	this.props = _.defaults(props, {
-		targetDataLength: 10
+		//
 	});
 	this.data = data || [];
 	this.init();
@@ -43,29 +43,27 @@ LineGraph.prototype = {
 		this.lineGenerator = d3.svg.line()
 			// control the curve of the line here
 		    .interpolate(lineInterpolation)
-		    .x(function(d) {
-		    	return this.x(this.xAccessor(d));
-		    }.bind(this))
-		    .y(function(d) {
-		    	return this.y(this.yAccessor(d));
-		    }.bind(this));
+		    .x(this.xAccessor.bind(this))
+		    .y(this.yAccessor.bind(this));
 
 		this.areaGenerator = d3.svg.area()
 			.interpolate(lineInterpolation)
-			.x(function(d){
-				return this.x(this.xAccessor(d));
-			}.bind(this))
+			.x(this.xAccessor.bind(this))
+			// bottom line
 			.y0(this.graphHeight)
-			.y1(function(d){
-				return this.y(this.yAccessor(d));
-			}.bind(this));
+			// top line
+			.y1(this.yAccessor.bind(this));
 
 		this.transition = d3.select({})
 			.transition()
 			.duration(750)
 			.ease("linear");
 
+		this.zoom = d3.behavior.zoom()
+			.on("zoom", this.draw.bind(this));
+
 		this.buildDOM();
+		this.update();
 	},
 	buildDOM: function(){
 
@@ -108,6 +106,12 @@ LineGraph.prototype = {
 			.append("g")
 			.attr("class", "dot-group");
 
+		this.svg.append("rect")
+		    .attr("class", "pane")
+		    .attr("width", this.graphWidth)
+		    .attr("height", this.graphHeight)
+		    .call(this.zoom);
+
 		// this.yAxisLabel = this.yAxisGroup.append("text")
 		// 	.attr("class", "label")
 		// 	.attr("transform", "rotate(-90)")
@@ -119,40 +123,37 @@ LineGraph.prototype = {
 
 	},
 	drawPoints: function(){
-		var self = this,
-			points = this.dotGroup.selectAll(".point")
-				.data(this.data);
+		var points = this.dotGroup.selectAll(".point")
+			.data(this.data);
 
 		// update
 		points
 			.transition()
-			.attr("cx", function(d){
-				return self.x(self.xAccessor(d));
-			})
-			.attr("cy", function(d){
-				return self.y(self.yAccessor(d));
-			});
+			.attr("cx", this.xAccessor.bind(this))
+			.attr("cy", this.yAccessor.bind(this));
 
 		// enter
 		points
 			.enter().append("svg:circle")
 			.attr("class", "point")
 			.attr("r", 2)
-			.attr("cx", function(d){
-				return self.x(self.xAccessor(d));
-			})
-			.attr("cy", function(d){
-				return self.y(self.yAccessor(d));
-			});
+			.attr("cx", this.xAccessor.bind(this))
+			.attr("cy", this.yAccessor.bind(this));
 
 		// exit
 		points.exit().remove();
 	},
-	xAccessor: function(d){
+	getXMetric: function(d){
 		return d.date._d;
 	},
-	yAccessor: function(d){
+	getYMetric: function(d){
 		return d.USD.last;
+	},
+	xAccessor: function(d){
+		return this.x(this.getXMetric(d));
+	},
+	yAccessor: function(d){
+		return this.y(this.getYMetric(d));
 	},
 	// not using this yet
 	findYatX: function(x, line){
@@ -167,29 +168,18 @@ LineGraph.prototype = {
 		}
 		return getXY(curLen);
 	},
-
-	getSegmentWidth: function(i1,i2){
-		return this.x(this.xAccessor(this.data[i2])) - this.x(this.xAccessor(this.data[i1]));
-	},
-
-	removeStaleData: function(startingIndex){
-		startingIndex = typeof startingIndex === "undefined"
-			? this.data.length - this.props.targetDataLength
-			: startingIndex;
-		this.data = this.data.slice(startingIndex, this.data.length);
-	},
-
 	update: function(newData){
-		var yMin, yMax,
-			leadingDataToPrune = 0,
-			dataOverflow = 0;
+
+		if(newData){
+			this.data = _.compact(newData);
+		}
 
 		/* SET DOMAINS */
-		yMin = d3.min(this.data, this.yAccessor);
-		yMax = d3.max(this.data, this.yAccessor);
+		var yMin = d3.min(this.data, this.getYMetric);
+		var yMax = d3.max(this.data, this.getYMetric);
 
   		this.x
-  			.domain(d3.extent(this.data, this.xAccessor));
+  			.domain(d3.extent(this.data, this.getXMetric));
 
 		this.y
   			.domain([
@@ -197,22 +187,12 @@ LineGraph.prototype = {
   				yMax + (yMax-yMin)/3
   			]);
 
-		this.xAxisGroup
-			.call(this.xAxis);
+		this.zoom.x(this.x);
 
-		this.yAxisGroup
-			.call(this.yAxis);
+		this.linePath.data(this.data);
+		this.area.data(this.data);
 
-		if(newData){
-			this.data = newData;
-			dataOverflow = this.data.length - this.props.maxData;
-		}
-
-		this.linePath
-			.attr("d", this.lineGenerator(this.data));
-
-		this.area
-			.attr("d", this.areaGenerator(this.data));
+		this.draw();
 
 		// this.xAxisGroup.selectAll(".tick").each(function(d, i){
 		// 	var x = this.x(d);
@@ -221,31 +201,47 @@ LineGraph.prototype = {
 
 		//this.xAxisGroup.selectAll(".tick line")
 
-		this.drawPoints();
 
 		// if we have too many data points
-		if(dataOverflow > 0) {
+		// if(dataOverflow > 0) {
+		//
+		// 	// horizontal distance that we are going to translate (the distance of the latest point)
+		// 	this.translateLeft = this.getSegmentWidth(this.data.length-2, this.data.length-1);
+		//
+		// 	// compare this.translateLeft to leadingSegmentWidth
+		// 	while(this.translateLeft > this.getSegmentWidth(leadingDataToPrune)){
+		// 		leadingDataToPrune++;
+		// 	}
+		//
+		// 	this.mainGroup
+		// 		.transition()
+		// 		.ease("linear")
+		// 		.each("end", function(d, i){
+		// 			if(leadingDataToPrune){
+		// 				this.removeStaleData(leadingDataToPrune);
+		// 			}
+		// 		}.bind(this))
+		// 		.attr("transform", "translate(" + this.translateLeft*-1 + ")");
+		//
+		// }
 
-			// horizontal distance that we are going to translate (the distance of the latest point)
-			this.translateLeft = this.getSegmentWidth(this.data.length-2, this.data.length-1);
+	},
+	draw: function(){
+		if(this.data && this.data.length){
 
-			// compare this.translateLeft to leadingSegmentWidth
-			while(this.translateLeft > this.getSegmentWidth(leadingDataToPrune)){
-				leadingDataToPrune++;
-			}
+			this.xAxisGroup
+				.call(this.xAxis);
+			this.yAxisGroup
+				.call(this.yAxis);
 
-			this.mainGroup
-				.transition()
-				.ease("linear")
-				.each("end", function(d, i){
-					if(leadingDataToPrune){
-						this.removeStaleData(leadingDataToPrune);
-					}
-				}.bind(this))
-				.attr("transform", "translate(" + this.translateLeft*-1 + ")");
+			this.linePath
+				.attr("d", this.lineGenerator);
+			this.area
+				.attr("d", this.areaGenerator);
+
+			this.drawPoints();
 
 		}
-
 	}
 };
 

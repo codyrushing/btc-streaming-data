@@ -22,10 +22,16 @@
 	.area {
 		fill: $graph-blue;
 		opacity: 0.5;
-	}	
+	}
 
 	.tick line {
 		stroke: $graph-blue;
+	}
+
+	.pane {
+		fill: none;
+		cursor: move;
+		pointer-events: all;
 	}
 
 }
