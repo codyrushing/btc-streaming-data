@@ -15,13 +15,11 @@ var LineGraph = function(el, props, data){
 LineGraph.prototype = {
 	init: function(){
 		var self = this,
-			lineInterpolation = "linear";
+			lineInterpolation = "monotone";
 
 		this.margin = {top: 20, right: 20, bottom: 30, left: 50};
 		this.graphWidth = this.props.width - this.margin.left - this.margin.right,
 		this.graphHeight = this.props.height - this.margin.top - this.margin.bottom;
-
-		this.translateLeft = 0;
 
 		this.x = d3.time.scale()
 			.range([0, this.graphWidth]);
@@ -31,13 +29,15 @@ LineGraph.prototype = {
 
 		this.xAxis = d3.svg.axis()
 			.scale(this.x)
+			.ticks(10)
+			.tickPadding(6)
 			.tickSize(-this.graphHeight)
-			.tickSubdivide(true)
 		    .orient("bottom");
 
 		this.yAxis = d3.svg.axis()
 		    .scale(this.y)
-		    .ticks(5)
+			.tickPadding(6)
+			.tickSize(-this.graphWidth)
 		    .orient("left");
 
 		this.lineGenerator = d3.svg.line()
@@ -82,28 +82,38 @@ LineGraph.prototype = {
 					.attr("width", this.graphWidth)
 					.attr("height", this.graphHeight);
 
-		this.xAxisGroup = this.svg.append("g")
-			.attr("class", "x axis")
-			.attr("transform", "translate(0," + this.graphHeight + ")");
+		this.svg.append("rect")
+		    .attr("class", "bg-fill")
+		    .attr("width", this.graphWidth)
+		    .attr("height", this.graphHeight);
 
-		this.yAxisGroup = this.svg.append("g")
+		this.yAxisGroup = this.svg
+			.append("g")
 			.attr("class", "y axis");
 
-		this.mainGroup = this.svg.append("g")
-			.attr("clip-path", "url(#clip)");
-
-		this.linePath = this.mainGroup
+		this.area = this.svg
 			.append("path")
-			.attr("class", "line");
-
-		this.area = this.mainGroup
-			.append("path")
+			.attr("clip-path", "url(#clip)")
 			.attr("class", "area")
 			.attr("id", "main-area")
 			.attr("fill", "#4682B4");
 
-		this.dotGroup = this.mainGroup
+		this.xAxisGroup = this.svg
 			.append("g")
+			.attr("class", "x axis")
+			.attr("transform", "translate(0," + this.graphHeight + ")");
+
+		this.xAxisGroup.select(".domain")
+			.attr("stroke-width", "2");
+
+		this.linePath = this.svg
+			.append("path")
+			.attr("clip-path", "url(#clip)")
+			.attr("class", "line");
+
+		this.dotGroup = this.svg
+			.append("g")
+			.attr("clip-path", "url(#clip)")
 			.attr("class", "dot-group");
 
 		this.svg.append("rect")
@@ -128,7 +138,7 @@ LineGraph.prototype = {
 
 		// update
 		points
-			.transition()
+			// .transition()
 			.attr("cx", this.xAccessor.bind(this))
 			.attr("cy", this.yAccessor.bind(this));
 
@@ -235,9 +245,9 @@ LineGraph.prototype = {
 				.call(this.yAxis);
 
 			this.linePath
-				.attr("d", this.lineGenerator);
+				.attr("d", this.lineGenerator(this.data));
 			this.area
-				.attr("d", this.areaGenerator);
+				.attr("d", this.areaGenerator(this.data));
 
 			this.drawPoints();
 

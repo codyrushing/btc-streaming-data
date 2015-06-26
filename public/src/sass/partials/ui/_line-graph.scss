@@ -1,31 +1,56 @@
-.line-graph {
+@mixin theme-graph($color-list){
+	.line-graph {
+		.line {
+			stroke: nth($color-list, 3);
+		}
 
-	$graph-blue: #4682B4;
+		.bg-fill {
+			fill: nth($color-list, 1);
+		}
+
+		.axis {
+			&.x {
+				.tick line {
+					stroke: nth($color-list, 1);
+				}
+			}
+			&.y {
+				.tick line {
+					stroke: $white;
+					stroke-opacity: 0.5;
+				}
+			}
+		}
+
+		.area {
+			fill: nth($color-list, 2);
+		}
+
+		.point {
+			fill: nth($color-list, 4);
+		}
+	}
+}
+
+.line-graph {
 
 	.axis path,
 	.axis line {
 	  fill: none;
-	  stroke: #ccc;
+	  stroke: #000;
 	  shape-rendering: crispEdges;
 	}
 	text {
-		fill: #ccc;
+		fill: #333;
 	}
 	.line {
 	  fill: none;
-	  stroke: $graph-blue;
-	  stroke-width: 1.5px;
-	}
-	.point {
-		fill: $graph-blue;
-	}
-	.area {
-		fill: $graph-blue;
-		opacity: 0.5;
+	  stroke: #000;
+	  stroke-width: 2px;
 	}
 
 	.tick line {
-		stroke: $graph-blue;
+		stroke: #000;
 	}
 
 	.pane {
@@ -35,3 +60,5 @@
 	}
 
 }
+
+@include theme-graph($btc-shades);

@@ -2,14 +2,29 @@
 @include border-box-sizing;
 
 html { height: 100%; position: relative; }
-body { background: url(../images/escheresque_ste.png) 0 0 repeat; font-size: 13px; font-family: 'PT Sans Narrow', sans-serif; color: $text-color-on-dark; min-height: 100%; position: absolute; width: 100%;}
-a, a:visited {
-	color: #fff; text-decoration: none; transition: all 0.1s ease-in-out;
-	.highlight { color: $primary-color; transition: all 0.1s ease-in-out; }
+body {
+	background-color: $white;
+	font-size: 13px;
+	font-family: 'PT Sans Narrow', sans-serif;
+	color: nth($btc-shades, 4);
+	min-height: 100%;
+	position: absolute;
+	width: 100%;
 }
+
+a, a:visited {
+	color: nth($btc-shades, 2);
+	text-decoration: none;
+	transition: all 0.1s ease-in-out;
+	.highlight {
+		color: $primary-color;
+		transition: all 0.1s ease-in-out;
+	}
+}
+
 a:hover {
-	color: $secondary-color;
-	.highlight { color: #fff; }
+	color: $tertiary-color;
+	.highlight { color: $secondary-color; }
 }
 
 h1, h2, h3, h4, h5, h6 {

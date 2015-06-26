@@ -6,6 +6,10 @@ var gulp = require("gulp"),
 	browserify = require("browserify"),
 	jshint = require("gulp-jshint"),
 	reactify = require("reactify"),
+	browserSync = require("browser-sync"),
+	filter = require("gulp-filter"),
+	autoprefixer = require('gulp-autoprefixer'),
+	lazypipe = require("lazypipe"),
 	source = require("vinyl-source-stream"),
 	// version of libsass used by gulp-sass is incompatible with susy, so we use gulp-ruby-sass
 	sass = require("gulp-ruby-sass"),
@@ -30,34 +34,25 @@ var gulp = require("gulp"),
 			return arg.indexOf("--") === 0;
 		});
 
-// precompile all jsx -> js
-gulp.task("react", function(){
-	return gulp.src(paths.src.app + "**/*.jsx")
-		.pipe(plumber())
-		.pipe(react())
-		.pipe( gulp.dest(paths.dist.js) );
-});
+var jsHintTasks = function(){
+	return lazypipe()
+		.pipe(plumber)
+		.pipe(changed, "./")
+		.pipe(jshint, '.jshintrc')
+		.pipe(jshint.reporter, 'jshint-stylish')
+		.pipe(jshint.reporter, 'fail')
+		();
+};
 
-gulp.task("scripts", /*["jshint"],*/ function(){
-	return gulp.start("browserify");
-});
 
-gulp.task("jshint", function(){
-	// jshint all js
-	return gulp.src("**/*.js", "!"+paths.dist.js, "!node_modules/")
-		.pipe(changed("./"))
-		.pipe(plumber())
-		.pipe(jshint())
-		.pipe(jshint.reporter("jshint-stylish"));
-});
-
-gulp.task("browserify", function(){
-	return gulp.src(paths.src.js + "app.js")
-		.pipe(plumber())
-		.pipe(browserify({
-			debug: true
-		}))
-		.pipe( gulp.dest( paths.dist.js ) );
+// GULP BrowserSync
+// Proxy an EXISTING vhost. This will wrap localhost:8090 and open localhost:3000
+gulp.task('browser-sync', function() {
+	browserSync({
+		files: [paths.dist.css + '**/*.css'],
+		proxy: 'localhost:3003',
+		open: false
+	});
 });
 
 gulp.task("reactify", function(){
@@ -72,6 +67,13 @@ gulp.task("reactify", function(){
 		.pipe(source("app.js"))
 		.pipe(gulp.dest(paths.dist.js));
 });
+
+gulp.task("hint", function(){
+	return gulp.src(paths.src.app + "app.js")
+		.pipe(jsHintTasks());
+});
+
+gulp.task("scripts", ["hint", "reactify"]);
 
 /*
 * YOU MUST ADD
@@ -92,7 +94,7 @@ gulp.task("server", function(){
 		script: "app.js",
 		ext: "js",
 		nodeArgs: nodeArgs,
-		ignore: ["public/", "gulpfile.js"]
+		ignore: ["public/", "gulpfile.js", "node_modules/"]
 	});
 
 	if(nodeArgs.length){
@@ -114,16 +116,21 @@ gulp.task("img", function(){
 });
 
 gulp.task("sass", function(){
-
 		sass(paths.src.sass,{
 			sourcemap: true,
 			loadPath: ["bower_components"]
 		})
 		.on("error", function(err){
-			console.log("* Sass Error *\nerr.message")
+			console.log("* Sass Error *\nerr.message");
 		})
+		.pipe(autoprefixer({
+			browsers: 'last 3 versions'
+		}))
 		.pipe(sourcemaps.write())
-		.pipe(gulp.dest( paths.dist.css ));
+		.pipe(gulp.dest( paths.dist.css ))
+		.pipe(filter("**/*.css"))
+		.pipe(browserSync.reload({stream: true})) //required for browserSync to work, even though we're useing the 'files' glob below
+		;
 });
 
 gulp.task("watch", function(){

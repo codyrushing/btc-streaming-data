@@ -6,7 +6,20 @@ var _ = require("lodash"),
 
 var ExchangeRateStore = _.assign({}, EventEmitter2.prototype, {
     items: [],
+    accessor: function(data){
+        return data && data.USD ? data.USD.last : null;
+    },
+    // if we already have two identical data points at the end of our array
+    // then knock out the middle one and add the new one 
+    isUnchanged: function(incoming){
+        var penUlt = this.accessor(this.items[this.items.length-2]),
+            ult = this.accessor(_.last(this.items));
+        return this.items.length > 2 && (penUlt === ult) && (ult === this.accessor(incoming));
+    },
     add: function(item){
+        if(this.isUnchanged(item)){
+            this.items.pop();
+        }
         this.items.push(item);
         this.emit("change");
     },

@@ -3,7 +3,7 @@ $nav-size: 1.2em;
 
 header {
 	padding-top: gutter();
-	nav { 
+	nav {
 		display: inline-block;
 		vertical-align: top;
 		height: $logo-size;
@@ -18,12 +18,27 @@ header {
 		}
 	}
 }
-#logo { 
+#logo {
 	position: relative;
 	display: inline-block;
 	font-size: $logo-size;
 	line-height: 1;
 	padding-bottom: 0.4em;
 	margin: 0 gutter();
-	.highlight { position: absolute; bottom: 0; right: 0; margin-top: -0.3em; font-size: 0.5em; text-transform: uppercase; letter-spacing: -0.05em; text-shadow: 0 -1px 0 rgba(0,0,0,0.5); }
+	.highlight {
+		color: $tertiary-color;
+		position: absolute;
+		bottom: 0;
+		right: 0;
+		margin-top: -0.3em;
+		font-size: 0.5em;
+		text-transform: uppercase;
+		letter-spacing: -0.05em;
+	}
+	&:hover {
+		color: $primary-color;
+		.highlight {
+			color: $primary-color;
+		}
+	}
 }
