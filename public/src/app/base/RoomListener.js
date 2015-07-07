@@ -1,6 +1,5 @@
 var socket = require("../socket"),
-	AppDispatcher = require("../dispatcher"),
-	moment = require("moment");
+	AppDispatcher = require("../dispatcher");
 
 var RoomListener = function(options){
 	this.options = options;
@@ -21,9 +20,9 @@ RoomListener.prototype = {
 		Object.keys(this.options.events).forEach(function(eventName){
 			socket.on(eventName, function(data){
 				// raw data coming from socket.io is in JSON, which has to stringify dates
-				// so parse dates here to get proper Moment object
-				if(data.date){
-					data.date = moment(data.date);
+				// so parse dates
+				if(typeof data.date === "string"){
+					data.date = new Date(data.date);
 				}
 				this.options.events[eventName](data);
 			}.bind(this));

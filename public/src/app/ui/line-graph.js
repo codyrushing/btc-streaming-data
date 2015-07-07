@@ -1,12 +1,13 @@
 // http://bl.ocks.org/mbostock/4015254
 // http://computationallyendowed.com/blog/2013/01/21/bounded-panning-in-d3.html
 var d3 = require("d3"),
+	moment = require("moment"),
 	_ = require("lodash");
 
-var LineGraph = function(el, props, data){
+var LineGraph = function(el, params, data){
 	this.el = el;
-	this.props = _.defaults(props, {
-		//
+	this.params = _.defaults(params, {
+		comparisonCurrency: "USD"
 	});
 	this.data = data || [];
 	this.init();
@@ -17,9 +18,9 @@ LineGraph.prototype = {
 		var self = this,
 			lineInterpolation = "monotone";
 
-		this.margin = {top: 20, right: 20, bottom: 30, left: 50};
-		this.graphWidth = this.props.width - this.margin.left - this.margin.right,
-		this.graphHeight = this.props.height - this.margin.top - this.margin.bottom;
+		this.margin = {top: 20, right: 20, bottom: 30, left: 100};
+		this.graphWidth = this.params.width - this.margin.left - this.margin.right,
+		this.graphHeight = this.params.height - this.margin.top - this.margin.bottom;
 
 		this.x = d3.time.scale()
 			.range([0, this.graphWidth]);
@@ -29,20 +30,26 @@ LineGraph.prototype = {
 
 		this.xAxis = d3.svg.axis()
 			.scale(this.x)
-			.ticks(10)
-			.tickPadding(6)
+			.ticks(Math.ceil(this.graphWidth/100))
 			.tickSize(-this.graphHeight)
+			.tickFormat(function(d){
+				return moment(d).fromNow();
+				//return d;
+			})
 		    .orient("bottom");
 
 		this.yAxis = d3.svg.axis()
 		    .scale(this.y)
-			.tickPadding(6)
+			.ticks(Math.ceil(this.graphHeight/60))
 			.tickSize(-this.graphWidth)
+			.tickFormat(function(d){
+				return d3.format(".2f")(d3.round(d, 3));
+			}.bind(this))
 		    .orient("left");
 
 		this.lineGenerator = d3.svg.line()
 			// control the curve of the line here
-		    .interpolate(lineInterpolation)
+			.interpolate(lineInterpolation)
 		    .x(this.xAccessor.bind(this))
 		    .y(this.yAccessor.bind(this));
 
@@ -68,8 +75,8 @@ LineGraph.prototype = {
 	buildDOM: function(){
 
 		this.svg = d3.select(this.el).append("svg")
-			.attr("height", this.props.height)
-			.attr("width", this.props.width)
+			.attr("height", this.params.height)
+			.attr("width", this.params.width)
 			.attr("class", "line-graph")
 			.append("g")
 			.attr("transform", "translate(" + this.margin.left + "," + this.margin.top + ")");
@@ -95,13 +102,12 @@ LineGraph.prototype = {
 			.append("path")
 			.attr("clip-path", "url(#clip)")
 			.attr("class", "area")
-			.attr("id", "main-area")
-			.attr("fill", "#4682B4");
+			.attr("id", "main-area");
 
 		this.xAxisGroup = this.svg
 			.append("g")
-			.attr("class", "x axis")
-			.attr("transform", "translate(0," + this.graphHeight + ")");
+				.attr("class", "x axis")
+				.attr("transform", "translate(0," + this.graphHeight + ")");
 
 		this.xAxisGroup.select(".domain")
 			.attr("stroke-width", "2");
@@ -154,16 +160,16 @@ LineGraph.prototype = {
 		points.exit().remove();
 	},
 	getXMetric: function(d){
-		return d.date._d;
+		return d.date;
 	},
 	getYMetric: function(d){
-		return d.USD.last;
+		return d[this.params.comparisonCurrency].last;
 	},
 	xAccessor: function(d){
-		return this.x(this.getXMetric(d));
+		return this.x(this.getXMetric.call(this, d));
 	},
 	yAccessor: function(d){
-		return this.y(this.getYMetric(d));
+		return this.y(this.getYMetric.call(this, d));
 	},
 	// not using this yet
 	findYatX: function(x, line){
@@ -179,17 +185,20 @@ LineGraph.prototype = {
 		return getXY(curLen);
 	},
 	update: function(newData){
-
 		if(newData){
 			this.data = _.compact(newData);
 		}
 
+		if(this.data && this.data.length){
+			this.comparisonCurrencySymbol = _.last(this.data)[this.params.comparisonCurrency].symbol;
+		}
+
 		/* SET DOMAINS */
-		var yMin = d3.min(this.data, this.getYMetric);
-		var yMax = d3.max(this.data, this.getYMetric);
+		var yMin = d3.min(this.data, this.getYMetric.bind(this));
+		var yMax = d3.max(this.data, this.getYMetric.bind(this));
 
   		this.x
-  			.domain(d3.extent(this.data, this.getXMetric));
+  			.domain(d3.extent(this.data, this.getXMetric.bind(this)));
 
 		this.y
   			.domain([
