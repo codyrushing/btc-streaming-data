@@ -85,10 +85,12 @@ ulimit -n 2560
 TO YOUR .bash_profile, otherwise browserify will fail
 */
 
-gulp.task("server", function(){
-	var r;
+gulp.task("mongod", function(){
+	return require("child_process").exec("mongod --noauth");
+});
 
-	require("child_process").exec("mongod --noauth");
+gulp.task("server", ["mongod"], function(){
+	var r;
 
 	r = nodemon({
 		script: "app.js",
@@ -99,10 +101,9 @@ gulp.task("server", function(){
 
 	if(nodeArgs.length){
 		require("child_process").spawn("node-inspector");
+		// console.log("Node Inspector instance running at http://localhost:8080/debug?port=5858");
 		require("child_process").spawn("open", ["http://localhost:8080/debug?port=5858"]);
 	}
-
-	//require("child_process").spawn("open", ["http://localhost:3003/"]);
 
 	return r;
 
@@ -121,7 +122,7 @@ gulp.task("sass", function(){
 			loadPath: ["bower_components"]
 		})
 		.on("error", function(err){
-			console.log("* Sass Error *\nerr.message");
+			console.log("* Sass Error *\n%s", err.message);
 		})
 		.pipe(autoprefixer({
 			browsers: 'last 3 versions'
