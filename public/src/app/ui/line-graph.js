@@ -16,7 +16,7 @@ var LineGraph = function(el, params, data){
 LineGraph.prototype = {
 	init: function(){
 		var self = this,
-			lineInterpolation = "monotone";
+			lineInterpolation = "linear";
 
 		this.margin = {top: 20, right: 20, bottom: 30, left: 100};
 		this.graphWidth = this.params.width - this.margin.left - this.margin.right,

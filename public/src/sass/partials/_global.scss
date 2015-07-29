@@ -3,28 +3,28 @@
 
 html { height: 100%; position: relative; }
 body {
-	background-color: $white;
+	background-color: nth($grays, 1);
 	font-size: 13px;
 	font-family: 'PT Sans Narrow', sans-serif;
-	color: nth($btc-shades, 4);
+	color: nth($grays, 4);
 	min-height: 100%;
 	position: absolute;
 	width: 100%;
 }
 
 a, a:visited {
-	color: nth($btc-shades, 2);
+	color: nth($grays, 3);
 	text-decoration: none;
 	transition: all 0.1s ease-in-out;
 	.highlight {
-		color: $primary-color;
+		font-weight: bold;
 		transition: all 0.1s ease-in-out;
 	}
 }
 
 a:hover {
-	color: $tertiary-color;
-	.highlight { color: $secondary-color; }
+	color: nth($grays, 4);
+	text-decoration: underline;
 }
 
 h1, h2, h3, h4, h5, h6 {

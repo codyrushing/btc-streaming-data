@@ -14,7 +14,9 @@ header {
 			font-size: $nav-size;
 			line-height: $logo-size/$nav-size;
 			display: inline-block;
-			&.active { color: $secondary-color; }
+			&.active {
+				text-decoration: underline;
+			}
 		}
 	}
 }
@@ -26,7 +28,7 @@ header {
 	padding-bottom: 0.4em;
 	margin: 0 gutter();
 	.highlight {
-		color: $tertiary-color;
+		color: nth($grays, 3);
 		position: absolute;
 		bottom: 0;
 		right: 0;
@@ -36,9 +38,9 @@ header {
 		letter-spacing: -0.05em;
 	}
 	&:hover {
-		color: $primary-color;
+		color: nth($grays, 4);
 		.highlight {
-			color: $primary-color;
+			color: nth($grays, 4);
 		}
 	}
 }

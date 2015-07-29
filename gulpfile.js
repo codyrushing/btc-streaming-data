@@ -101,7 +101,6 @@ gulp.task("server", ["mongod"], function(){
 
 	if(nodeArgs.length){
 		require("child_process").spawn("node-inspector");
-		// console.log("Node Inspector instance running at http://localhost:8080/debug?port=5858");
 		require("child_process").spawn("open", ["http://localhost:8080/debug?port=5858"]);
 	}
 
