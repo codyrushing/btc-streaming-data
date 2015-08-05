@@ -12,8 +12,11 @@ $susy: (
 @import "normalize-scss/normalize";
 @import "susy/sass/susy";
 
+@include border-box-sizing();
+
 @import "partials/base";
 @import "partials/global";
+@import "partials/grid";
 @import "partials/header";
 @import "partials/footer";
 

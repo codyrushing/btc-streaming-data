@@ -10,24 +10,21 @@ var PageView = React.createClass({
   	render: function() {
 
 		return (
-			<div>
-				<section className="wrapper">
-					<header>
-						<a id="logo" href="/">
-							Blockchain<span className="highlight">&nbsp;Realtime</span>
-						</a>
-						<TopNav />
-					</header>
+			<div className="wrapper">
+				<header>
+					<a id="logo" href="/">
+						Blockchain<span className="highlight">&nbsp;Realtime</span>
+					</a>
+					<TopNav />
+				</header>
 
-					<Router.RouteHandler />
+				<Router.RouteHandler />
 
-					<footer>
-						<nav>
-							<a href="https://github.com/codyrushing/btc-streaming-data" target="_blank">Github</a>
-						</nav>
-					</footer>
-				</section>
-
+				<footer>
+					<nav>
+						<a href="https://github.com/codyrushing/btc-streaming-data" target="_blank">Github</a>
+					</nav>
+				</footer>
 			</div>
 		);
   	}

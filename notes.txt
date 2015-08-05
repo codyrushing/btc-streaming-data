@@ -1,0 +1,17 @@
+every hour-ish? https://blockchain.info/stats?format=json
+- hashrate
+- electricity
+- market cap
+- transaction volume (all btc being traded on the network)
+- trade volume or exchange volume (btc being converted to USD)
+- difficulty
+- miners revenue
+- total bc in circulation
+- number of transactions
+
+more realtime-ish
+- exchange rate
+- transactions
+
+block detail
+- not that much to see here for the avg person

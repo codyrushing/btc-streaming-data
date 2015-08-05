@@ -1,0 +1,17 @@
+.wrapper {
+    @include container();
+    padding: gutters();
+    max-width: 1200px;
+}
+
+.dashboard {
+  .dashboard-header {
+    @include span(12);
+  }
+  .metric {
+    min-height: 100px;
+    background: red;
+    @include gallery(4 of 12);
+    margin-bottom: gutter();
+  }
+}
