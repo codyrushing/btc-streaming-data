@@ -3,11 +3,13 @@ var gulp = require("gulp"),
 	runSequence = require("run-sequence"),
 	nodemon = require("gulp-nodemon"),
 	plumber = require("gulp-plumber"),
+	eslint = require("gulp-eslint"),
 	browserify = require("browserify"),
-	jshint = require("gulp-jshint"),
-	reactify = require("reactify"),
+	babelify = require("babelify"),
+	uglify = require("gulp-uglify"),
+	notify = require("gulp-notify"),
 	browserSync = require("browser-sync"),
-	filter = require("gulp-filter"),
+	gulpFilter = require("gulp-filter"),
 	autoprefixer = require('gulp-autoprefixer'),
 	lazypipe = require("lazypipe"),
 	source = require("vinyl-source-stream"),
@@ -55,25 +57,25 @@ gulp.task('browser-sync', function() {
 	});
 });
 
-gulp.task("reactify", function(){
-	var b = browserify({
-		debug: true
-	});
-	b.transform(reactify);
-	b.add(paths.src.app + "app.js");
-
-	return b.bundle()
-		.pipe(plumber())
+gulp.task("babelify", ["eslint"], function(){
+	return browserify(paths.src.app + "app.js", {debug: true})
+		.transform("babelify")
+		.bundle()
+		.on("error", function(err){
+            console.log(err.message);
+            this.emit("end");
+        })
 		.pipe(source("app.js"))
-		.pipe(gulp.dest(paths.dist.js));
+		.pipe(gulp.dest(paths.dist.js))
+		.pipe(notify("app.js built :)"));
 });
 
-gulp.task("hint", function(){
-	return gulp.src(paths.src.app + "app.js")
-		.pipe(jsHintTasks());
+gulp.task("eslint", function(){
+	return gulp.src(paths.src.app + "**/*.js")
+		.pipe(eslint())
+		.pipe(eslint.format())
+		.pipe(eslint.failAfterError());
 });
-
-gulp.task("scripts", ["hint", "reactify"]);
 
 /*
 * YOU MUST ADD
@@ -109,7 +111,6 @@ gulp.task("server", ["mongod"], function(){
 });
 
 gulp.task("img", function(){
-
 	return gulp.src([paths.src.img + "**/*.{png,jpg,gif,svg}"])
 		.pipe(plumber())
 		.pipe(gulp.dest(paths.dist.img));
@@ -128,16 +129,16 @@ gulp.task("sass", function(){
 		}))
 		.pipe(sourcemaps.write())
 		.pipe(gulp.dest( paths.dist.css ))
-		.pipe(filter("**/*.css"))
+		.pipe(gulpFilter("**/*.css"))
 		.pipe(browserSync.reload({stream: true})) //required for browserSync to work, even though we're useing the 'files' glob below
 		;
 });
 
 gulp.task("watch", function(){
-	gulp.watch([paths.src.app + "**/*.{js,jsx}"], ["reactify"]);
+	gulp.watch([paths.src.app + "**/*.{js,jsx}"], ["babelify"]);
 	//gulp.watch([paths.src.js + "**/*.js", "!gulpfile.js"], ["scripts"]);
 	gulp.watch([paths.src.sass + "**/*.scss"], ["sass"]);
 	gulp.watch(["gulpfile.js"], ["dev"]);
 });
 
-gulp.task("dev", ["server", "img", "reactify", "sass", "watch"]);
+gulp.task("dev", ["server", "img", "babelify", "sass", "watch"]);
