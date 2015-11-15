@@ -1,5 +1,5 @@
 var gulp = require("gulp"),
-	changed = require("gulp-changed"),
+	newer = require("gulp-newer"),
 	runSequence = require("run-sequence"),
 	nodemon = require("gulp-nodemon"),
 	plumber = require("gulp-plumber"),
@@ -36,17 +36,6 @@ var gulp = require("gulp"),
 			return arg.indexOf("--") === 0;
 		});
 
-var jsHintTasks = function(){
-	return lazypipe()
-		.pipe(plumber)
-		.pipe(changed, "./")
-		.pipe(jshint, '.jshintrc')
-		.pipe(jshint.reporter, 'jshint-stylish')
-		.pipe(jshint.reporter, 'fail')
-		();
-};
-
-
 // GULP BrowserSync
 // Proxy an EXISTING vhost. This will wrap localhost:8090 and open localhost:3000
 gulp.task('browser-sync', function() {
@@ -72,6 +61,7 @@ gulp.task("babelify", ["eslint"], function(){
 
 gulp.task("eslint", function(){
 	return gulp.src(paths.src.app + "**/*.js")
+		.pipe(newer(paths.dist.js + "app.js"))
 		.pipe(eslint())
 		.pipe(eslint.format())
 		.pipe(eslint.failAfterError());
@@ -130,7 +120,7 @@ gulp.task("sass", function(){
 		.pipe(sourcemaps.write())
 		.pipe(gulp.dest( paths.dist.css ))
 		.pipe(gulpFilter("**/*.css"))
-		.pipe(browserSync.reload({stream: true})) //required for browserSync to work, even though we're useing the 'files' glob below
+		.pipe(browserSync.reload({stream: true})) //required for browserSync to work, even though we're using the 'files' glob below
 		;
 });
 

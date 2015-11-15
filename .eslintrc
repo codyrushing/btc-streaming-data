@@ -1,6 +1,10 @@
 {
     "ecmaFeatures": {
         "jsx": true,
-        "templateStrings": true
+        "es6": true
+    },
+    "env": {
+        "browser": true,
+        "es6": true
     }
 }

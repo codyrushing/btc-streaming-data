@@ -4,32 +4,35 @@ var _ = require("lodash"),
     constants = require("../constants"),
     RoomListener = require("../base/RoomListener");
 
-var ExchangeRateStore = _.assign({}, EventEmitter2.prototype, {
-    items: [],
-    accessor: function(data){
+class ExchangeRateStore extends EventEmitter2 {
+    constructor(){
+        super()
+        this.items = [];
+    }
+    accessor(data){
         return data && data.USD ? data.USD.last : null;
-    },
+    }
     // if we already have two identical data points at the end of our array
-    // then knock out the middle one and add the new one 
-    isUnchanged: function(incoming){
+    // then knock out the middle one and add the new one
+    isUnchanged(incoming){
         var penUlt = this.accessor(this.items[this.items.length-2]),
             ult = this.accessor(_.last(this.items));
         return this.items.length > 2 && (penUlt === ult) && (ult === this.accessor(incoming));
-    },
-    add: function(item){
+    }
+    add(item){
         if(this.isUnchanged(item)){
             this.items.pop();
         }
         this.items.push(item);
         this.emit("change");
-    },
-    getAll: function(){
+    }
+    getAll(){
         return this.items;
-    },
-    getCurrent: function(){
+    }
+    getCurrent(){
         return _.last(this.items);
     }
-});
+};
 
 var ExchangeRateRoomListener = new RoomListener({
     room: "exchange-rate",

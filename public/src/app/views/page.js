@@ -18,8 +18,6 @@ var PageView = React.createClass({
 					<TopNav />
 				</header>
 
-				<Router.RouteHandler />
-
 				<footer>
 					<nav>
 						<a href="https://github.com/codyrushing/btc-streaming-data" target="_blank">Github</a>

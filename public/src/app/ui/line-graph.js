@@ -30,7 +30,7 @@ LineGraph.prototype = {
 
 		this.xAxis = d3.svg.axis()
 			.scale(this.x)
-			.ticks(Math.ceil(this.graphWidth/100))
+			.ticks(Math.ceil(this.graphWidth/150))
 			.tickSize(-this.graphHeight)
 			.tickFormat(function(d){
 				return moment(d).fromNow();

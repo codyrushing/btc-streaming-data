@@ -37,14 +37,12 @@ window.React = React;
 var app = {
 	init: function(){
 		// defined here because it needs access to our app object
+		var w = parseInt("20")
 		document.addEventListener("DOMContentLoaded", this.domReady.bind(this))
 		return this;
 	},
 	domReady: function(){
-		Router.run(routes, Router.HistoryLocation, function(Handler){
-			React.render(<Handler />,document.body);
-		});
-
+		require("./routes")(document.body)
 		// this.bindEvents(document);
 		// this.appNavigate(window.location.pathname, false, true);
 	}

@@ -9,7 +9,7 @@ var React = require("react"),
 var ExchangeRateView = React.createClass({
 	getDefaultProps: function(){
 		return {
-			maxData: 10
+			maxData: 100
 		};
 	},
 	componentWillMount: function(){

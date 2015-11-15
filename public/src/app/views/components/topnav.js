@@ -9,10 +9,10 @@ var TopNav = React.createClass({
 			"/current-block": "Current Block",
 			"/transactions": "Transactions"
 		},
-		nav = Object.keys(navItems).map(function(route){
+		nav = Object.keys(navItems).map(function(route, i){
 			var title = navItems[route];
 			return (
-				<Link to={route} title={title}>{title}</Link>
+				<Link to={route} key={i} title={title}>{title}</Link>
 			);
 		}, this);
 
