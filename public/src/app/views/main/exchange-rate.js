@@ -1,7 +1,8 @@
 var React = require("react"),
 	_ = require("lodash"),
 	constants = require("../../constants"),
-	LineGraph = require("../../ui/line-graph"),
+	Header = require("../components/header"),
+	LineGraph = require("app/graphs/line-graph"),
 	AppDispatcher = require("../../dispatcher"),
 	ExchangeRateStore = require("../../stores/ExchangeRateStore"),
 	ExchangeRateActions = require("../../actions/ExchangeRateActions");
@@ -82,11 +83,11 @@ var ExchangeRateView = React.createClass({
   			);
   		});
   		return (
-  			<main className="exchange-rate">
-  				<div className="chart-container">
+			<main className="exchange-rate">
+				<div className="chart-container">
 
-  				</div>
-  			</main>
+				</div>
+			</main>
   		);
   	}
 });

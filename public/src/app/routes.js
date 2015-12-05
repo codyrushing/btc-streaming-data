@@ -20,5 +20,5 @@ module.exports = function(el){
 		</Router>
 		),
 		el
-	);	
+	);
 };

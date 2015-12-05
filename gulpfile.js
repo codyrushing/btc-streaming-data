@@ -62,7 +62,16 @@ gulp.task("babelify", ["eslint"], function(){
 gulp.task("eslint", function(){
 	return gulp.src(paths.src.app + "**/*.js")
 		.pipe(newer(paths.dist.js + "app.js"))
-		.pipe(eslint())
+		.pipe(eslint({
+			ecmaFeatures: {
+		        jsx: true,
+		        es6: true
+		    },
+		    env: {
+		        browser: true,
+		        es6: true
+		    }
+		}))
 		.pipe(eslint.format())
 		.pipe(eslint.failAfterError());
 });
